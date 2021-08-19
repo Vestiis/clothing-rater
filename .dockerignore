@@ -1,8 +1,8 @@
+env
+clothing-rater.json
 *.pem
 .idea
-env
 clothing_rater.egg-info
 code_tests.py
-clothing-rater.json
 tags
 install_python_env.sh
