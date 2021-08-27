@@ -13,7 +13,7 @@ env:
   REGION: europe-west1
 
   REGISTRY_LOCATION: eu.gcr.io
-  REGISTRY_IMAGE_NAME: eu.gcr.io/impactful-ring-314819/clothing-rater/main
+  REGISTRY_IMAGE_NAME: eu.gcr.io/impactful-ring-314819/clothing-rater
 
 jobs:
   build-deploy:
@@ -46,9 +46,6 @@ jobs:
       - name: Push
         run: |
           docker push ${{ env.REGISTRY_IMAGE_NAME }}:${{ github.sha }}
-      - name: Add latest tag to image in registry
-        run: |
-          gcloud artifacts docker tags add ${{ env.REGISTRY_IMAGE_NAME }}:${{ github.sha }} ${{ env.REGISTRY_IMAGE_NAME }}:latest
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE }} \
