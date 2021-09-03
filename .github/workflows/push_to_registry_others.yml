@@ -4,7 +4,8 @@ name: Build and Deploy to Cloud Run
 on:
   push:
     branches:
-      - main
+      - "**" # matches every branch
+      - "!main" # excludes main
   workflow_dispatch:
 
 env:
@@ -30,11 +31,6 @@ jobs:
           service_account_key: ${{ secrets.CLOTHING_RATER_SA_KEY }}
           export_default_credentials: true
 
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.8
-
       - name: Authorize Docker push
         run: gcloud auth configure-docker -q ${{ env.REGISTRY_LOCATION }}
 
@@ -46,10 +42,3 @@ jobs:
       - name: Push
         run: |
           docker push ${{ env.REGISTRY_IMAGE_NAME }}:${{ github.sha }}
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy ${{ env.SERVICE }} \
-            --region ${{ env.REGION }} \
-            --image ${{ env.REGISTRY_IMAGE_NAME }}:${{ github.sha }} \
-            --platform "managed" \
-            --quiet

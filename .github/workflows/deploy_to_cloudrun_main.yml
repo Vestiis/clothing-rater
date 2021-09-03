@@ -1,0 +1,50 @@
+# https://github.com/docker/build-push-action/issues/124
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: impactful-ring-314819
+  SERVICE: clothing-rater-api
+  REGION: europe-west1
+
+  REGISTRY_LOCATION: eu.gcr.io
+  REGISTRY_IMAGE_NAME: eu.gcr.io/impactful-ring-314819/clothing-rater
+
+jobs:
+  build-deploy:
+    name: Build, tag, and push Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0.2.0
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.CLOTHING_RATER_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Authorize Docker push
+        run: gcloud auth configure-docker -q ${{ env.REGISTRY_LOCATION }}
+
+      - name: Build Container
+        run: |
+          docker build . \
+          -t ${{ env.REGISTRY_IMAGE_NAME }}:${{ github.sha }} \
+          -t ${{ env.REGISTRY_IMAGE_NAME }}:latest
+      - name: Push
+        run: |
+          docker push ${{ env.REGISTRY_IMAGE_NAME }}:${{ github.sha }}
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --region ${{ env.REGION }} \
+            --image ${{ env.REGISTRY_IMAGE_NAME }}:${{ github.sha }} \
+            --platform "managed" \
+            --quiet
