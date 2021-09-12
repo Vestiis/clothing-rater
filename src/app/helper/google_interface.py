@@ -12,8 +12,7 @@ class GoogleInterface:
     def __init__(self):
 
         self.request = google.auth.transport.requests.Request()
-        # todo add audience
-        self.target_audience = ""
+        self.target_audience = "https://clothing-rater-api-n7s7fuxxna-ew.a.run.app"
 
     def current_service_account_email(self):
         try:

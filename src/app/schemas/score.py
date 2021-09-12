@@ -1,20 +1,21 @@
 import base64
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, validator
 
 
-class ScoreMessage(BaseModel):
-    image_bytes: Optional[Union[str, bytes]] = None
-    image_url: Optional[str] = None
-    image_label: Optional[str] = None
+class LabelMessage(BaseModel):
+    images: Optional[Union[List[str], List[bytes]]] = None
+    images_urls: Optional[str] = None
+    images_labels: Optional[str] = None
 
-    @validator("image_bytes")
-    def image_to_bytes(cls, image_bytes):
-        if image_bytes is not None and isinstance(image_bytes, str):
-            # cast string to bytes in base 2
-            return base64.decodebytes(image_bytes.encode("utf8"))
-        return image_bytes
+    @validator("images")
+    def images_to_bytes(cls, images):
+        if images is not None:
+            return [
+                base64.decodebytes(x.encode("utf8")) if isinstance(x, str) else x
+                for x in images
+            ]
 
 
 class ScoreResponse(BaseModel):
