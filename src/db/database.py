@@ -10,6 +10,8 @@ engine = create_engine(
     Config.SQLALCHEMY_DATABASE_URI,
     connect_args={"sslmode": "require"},
     pool_pre_ping=True,
+    pool_size=90,
+    max_overflow=10,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
