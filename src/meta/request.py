@@ -8,7 +8,6 @@ from pydantic import validator
 
 from src.app.helper.google_interface import GoogleInterface
 from src.app.schemas.score import LabelMessage
-from src.meta.config import ConfigMeta
 
 logger = logging.getLogger(__name__)
 

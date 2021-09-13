@@ -6,4 +6,5 @@ code_tests.py
 clothing-rater.json
 tags
 install_python_env.sh
+**/__pycache__
 sample_labels
