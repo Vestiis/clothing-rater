@@ -6,15 +6,15 @@ secrets = secretmanager.SecretManagerServiceClient()
 
 
 class Config:
-    INSTANCE_CONNECTION = "impactful-ring-314819:europe-west1:clothing-rater-postgres"
-    POSTGRES_DB = "postgres"
     POSTGRES_SECRETS = json.loads(
         secrets.access_secret_version(
             request={
-                "name": "projects/439044485118/secrets/postgres_secrets/versions/1"
+                "name": "projects/439044485118/secrets/postgres_secrets/versions/3"
             }
         ).payload.data.decode("utf-8")
     )
+    POSTGRES_DB = "postgres"
+    INSTANCE_CONNECTION = POSTGRES_SECRETS["private_ip"]
     SQLALCHEMY_DATABASE_BASE = (
         f"postgresql+psycopg2://{POSTGRES_SECRETS['user']}:"
         f"{POSTGRES_SECRETS['password']}"
