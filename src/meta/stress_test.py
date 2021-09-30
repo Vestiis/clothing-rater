@@ -11,7 +11,6 @@ from multiprocessing.dummy import Pool
 import requests
 
 from src.app.routes.score import RouteType
-from src.meta.config import ConfigMeta
 from src.meta.request import post_compute_score
 
 
@@ -20,12 +19,16 @@ def cut_in_sub_lists(elems, chunk_size):
     return list(elems[i : i + chunk_size] for i in range(0, len(elems), chunk_size))
 
 
-# API_URL = "http://localhost"
-API_URL = os.environ["API_URL"]
-REQUESTS_AMOUNT = 100
-REQUESTS_PER_SECOND = 10
+API_URL = "http://localhost"
+API_PORT = 5001
+# API_URL = os.environ["API_URL"]
+# API_PORT = 8080
+REQUESTS_AMOUNT = 200
+# REQUESTS_PER_SECOND = 10
+REQUESTS_PER_SECOND = REQUESTS_AMOUNT
 IMAGES_PER_REQUEST_AMOUNT = 1
-MAX_CONCURRENT_REQUESTS = 20
+# MAX_CONCURRENT_REQUESTS = 20
+MAX_CONCURRENT_REQUESTS = 100
 IMAGE_URL = (
     "https://static9.depositphotos.com/1011514/1077/i/950/"
     "depositphotos_10773191-stock-photo-clothing-label.jpg"
@@ -49,7 +52,7 @@ if __name__ == "__main__":
                 pool.apply_async(
                     post_compute_score,
                     (request_images, RouteType.post_compute_score_from_image_bytes,),
-                    {"api_url": API_URL},
+                    {"api_url": API_URL, "api_port": API_PORT},
                 )
             )
             print(

@@ -37,7 +37,9 @@ def get_application() -> FastAPI:
         tags=["score"],
         # dependencies=[Depends(check_security)],
     )
-    app.include_router(api_router, prefix="/v1")
+    app.include_router(
+        api_router, prefix="/v1"  # , dependencies=[Depends(check_security)
+    )
     return app
 
 

@@ -36,7 +36,10 @@ jobs:
 
       - name: Build Container
         run: |
-          docker build . \
+          docker build \
+          --build-arg ssh_prv_key="${{ secrets.CLOTHING_RATER_ID_RSA}}" \
+          --build-arg ssh_pub_key="${{ secrets.CLOTHING_RATER_ID_RSA_PUB}}" \
+          . \
           -t ${{ env.REGISTRY_IMAGE_NAME }}:${{ github.sha }} \
           -t ${{ env.REGISTRY_IMAGE_NAME }}:latest
       - name: Push
