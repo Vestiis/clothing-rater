@@ -71,8 +71,6 @@ if __name__ == "__main__":
             try:
                 # For each future, wait until the request is finished
                 # and then print the response object.
-                print("there0")
                 print(async_result.get())
-                print("there1")
             except requests.exceptions.ReadTimeout:
                 print(f"{i}th batch of requests encounters a timeout issue")
