@@ -1,15 +1,16 @@
+import os
 from dataclasses import dataclass
 from statistics import mean
 from typing import List, Optional
 
+import numpy as np
 import pandas as pd
+from database.api.meta.country import get_all_countries
+from database.api.meta.material import get_all_materials
+from database.schemas.country import Country
+from database.schemas.material import Material
 from sqlalchemy.orm import Session
 
-from src.db.crud.country import get_countries_as_dataframe
-from src.db.crud.material import get_materials, get_materials_as_dataframe
-from src.db.database import get_db
-from src.db.schemas.country import Country
-from src.db.schemas.material import Material
 from src.words_matcher import WordsMatcher
 
 HIGHER_IS_SOCIALLY_BETTER = [
@@ -32,6 +33,20 @@ HIGHER_IS_ECOLOGY_WORSE = [
 # todo: check why column is named health_harmfulness and a high score there
 # todo: leads to a high overall score
 # todo: the column is possibly wrongly named
+
+DATABASE_API_URL = os.environ.get("DATABASE_API_URL")
+
+
+def get_countries_as_dataframe():
+    return pd.DataFrame(
+        data=get_all_countries(api_url=DATABASE_API_URL, serialize_as_python_obj=False)
+    )
+
+
+def get_materials_as_dataframe():
+    return pd.DataFrame(
+        data=get_all_materials(api_url=DATABASE_API_URL, serialize_as_python_obj=False)
+    )
 
 
 @dataclass
@@ -63,17 +78,15 @@ class Scorer:
         self,
         ecology_importance: float = 1,
         societal_importance: float = 1,
-        db: Optional[Session] = None,
         words_matcher: Optional[WordsMatcher] = None,
     ):
         self.ecology_importance = ecology_importance
         self.societal_importance = societal_importance
-        self.db = db if db is not None else next(get_db())
         self.words_matcher = (
             words_matcher if words_matcher is not None else WordsMatcher()
         )
-        self.df_countries = get_countries_as_dataframe(db=self.db).set_index("name")
-        self.df_materials = get_materials_as_dataframe(db=self.db).set_index("name")
+        self.df_countries = get_countries_as_dataframe().set_index("name")
+        self.df_materials = get_materials_as_dataframe().set_index("name")
 
     def get_material_score(self, material: pd.Series) -> float:
         return get_score_relative_to_other_elements(
@@ -84,10 +97,10 @@ class Scorer:
         )
 
     def ecology_score(self, label: str) -> float:
-        materials = get_materials(db=self.db)
+        # materials = get_materials(db=self.db)
         materials_in_label = set(
             self.words_matcher.similar_referential_words_per_sentence(
-                sentences=[label], referential=[x.name for x in materials]
+                sentences=[label], referential=[x for x in self.df_materials.index]
             )[0][0]
         )
         return mean(
@@ -125,7 +138,3 @@ class Scorer:
             self.ecology_importance * self.ecology_score(label)
             + self.societal_importance * self.societal_score(label)
         ) / (self.ecology_importance + self.societal_importance)
-
-
-def get_scorer():
-    pass
