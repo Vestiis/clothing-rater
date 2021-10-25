@@ -11,8 +11,8 @@ class LabelMessage(BaseModel):
     user_id: str
     preferences: List[str]
     images: Optional[Union[List[str], List[bytes]]] = None
-    images_urls: Optional[str] = None
-    images_labels: Optional[str] = None
+    images_urls: Optional[List[str]] = None
+    images_labels: Optional[List[str]] = None
 
     @validator("images")
     def images_to_bytes(cls, images):
