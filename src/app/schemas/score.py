@@ -3,8 +3,13 @@ from typing import List, Optional, Union
 
 from pydantic import BaseModel, validator
 
+from src.interpreter import LabelCountry, LabelMaterial
+from src.scorer import GlobalScore
+
 
 class LabelMessage(BaseModel):
+    user_id: str
+    preferences: List[str]
     images: Optional[Union[List[str], List[bytes]]] = None
     images_urls: Optional[str] = None
     images_labels: Optional[str] = None
@@ -19,4 +24,6 @@ class LabelMessage(BaseModel):
 
 
 class ScoreResponse(BaseModel):
-    score: float
+    score: GlobalScore
+    materials: List[LabelMaterial]
+    country: LabelCountry

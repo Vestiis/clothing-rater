@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Security
+from fastapi import APIRouter, FastAPI, HTTPException, Security
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse

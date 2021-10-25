@@ -3,6 +3,7 @@ import itertools
 import logging
 import multiprocessing
 import os
+from dataclasses import dataclass
 from functools import lru_cache, partial
 from typing import List, Sequence, Tuple, Union
 
@@ -13,6 +14,14 @@ from src.config import WordsMatcherConfig
 from src.utils import chunks
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Match:
+    found_word: str
+    matching_sub_sentence: str
+    score: float
+    sentence: str
 
 
 class WordsMatcher:
@@ -55,7 +64,7 @@ class WordsMatcher:
         (
             similar_referential_words_per_sentence,
             referential_words_scores_per_sentence,
-        ) = self.similar_referential_words_per_sentence(sentences, referential)
+        ) = self.find_words_in_sentences(sentences, referential)
         return [
             similar_referential_words_per_sentence[sentence_idx][
                 np.argmax(referential_words_scores_per_sentence[sentence_idx])
@@ -65,13 +74,11 @@ class WordsMatcher:
             for sentence_idx in range(len(sentences))
         ]
 
-    def similar_referential_words_per_sentence(
+    def find_words_in_sentences(
         self, sentences: Sequence[str], referential: Sequence[str],
     ) -> Tuple[List[List[str]], List[List[float]]]:
         if not self.extract_with_multi_process:
-            return self._similar_referential_words_per_sentence(
-                sentences, self, referential
-            )
+            return self._find_words_in_sentences(sentences, self, referential)
         processes = multiprocessing.cpu_count()
         logger.info(
             f"Extraction of similar referential words has been required"
@@ -79,9 +86,9 @@ class WordsMatcher:
             f"number of available threads for multiprocess: {processes}"
         )
         pool = multiprocessing.Pool(processes=processes)
-        words_referential_and_scores = pool.map(
+        matches_per_sentence = pool.map(
             partial(
-                self._similar_referential_words_per_sentence,
+                self._find_words_in_sentences,
                 words_matcher=self,
                 referential=referential,
             ),
@@ -89,53 +96,29 @@ class WordsMatcher:
         )
         pool.close()
         pool.join()
-        similar_ref_words_per_sentence = list(
-            itertools.chain(
-                *[
-                    ref_words_per_sentence
-                    for (ref_words_per_sentence, _) in words_referential_and_scores
-                ]
-            )
-        )
-        similar_ref_words_scores_per_sentence = list(
-            itertools.chain(
-                *[
-                    ref_words_scores_per_sentence
-                    for (
-                        _,
-                        ref_words_scores_per_sentence,
-                    ) in words_referential_and_scores
-                ]
-            )
-        )
-        return similar_ref_words_per_sentence, similar_ref_words_scores_per_sentence
+        return list(itertools.chain(*matches_per_sentence))
 
     @staticmethod
-    def _similar_referential_words_per_sentence(
+    def _find_words_in_sentences(
         sentences: Sequence[str],
         words_matcher: "WordsMatcher",
         referential: Sequence[str],
     ) -> Tuple[List[List[str]], List[List[float]]]:
-        similar_referential_words_per_sentence = []
-        referential_words_scores_per_sentence = []
+
+        matches_per_sentence = []
         for sentence in sentences:
-            (
-                similar_referential_words,
-                referential_words_scores,
-            ) = WordsMatcher._similar_referential_words_in_sentence(
+            (matches) = WordsMatcher._find_words_in_sentence(
                 words_matcher, sentence, referential
             )
-            similar_referential_words_per_sentence.append(similar_referential_words)
-            referential_words_scores_per_sentence.append(referential_words_scores)
-        return (
-            similar_referential_words_per_sentence,
-            referential_words_scores_per_sentence,
-        )
+
+            matches_per_sentence.append(matches)
+
+        return matches_per_sentence
 
     @staticmethod
-    def _similar_referential_words_in_sentence(
+    def _find_words_in_sentence(
         words_matcher: "WordsMatcher", sentence: str, referential: Sequence[str],
-    ) -> Tuple[List[str], List[float]]:
+    ) -> List[Match]:
         """Finds the referential words that are found in sentence with a similarity above some threshold parameter
 
         :param words_matcher: An instance of the WordsMatcher class
@@ -144,53 +127,57 @@ class WordsMatcher:
         :returns: A list of referential words found in sentence
         :returns: The list of the similarities scores of the referential words found in sentence
         """
-        sentence_words = words_matcher.tokenize(
-            words_matcher.standardize_word(sentence)
-        )
+        standardized_sentence = words_matcher.standardize_word(sentence)
+        sentence_words = words_matcher.tokenize(standardized_sentence)
         referential_words = []
         # standard_ref_words words might have been modified compared to ref_words words
         # e.g Make-Up standardized to make up
         standardized_referential_words = []
-        all_subsentences = []
+        sub_sentences = []
         for referential_word in referential:
-            if referential_word == "Italie":
-                print()
-            # standardize to common spelling e.g L'Oréal to l'oreal
             standard_ref_word = words_matcher.standardize_word(referential_word)
             if standard_ref_word not in words_matcher.referential_words_as_tokens:
                 words_matcher.referential_words_as_tokens[
                     standard_ref_word
                 ] = words_matcher.tokenize(standard_ref_word)
-            for n_grams in range(
-                1,
-                # for words like "République démocratique populaire lao",
-                # generate all 1-grams, 2-grams, 3-grams and also 4-grams words
-                # from sentence in case a bad split has resulted in a spelling error
-                len(words_matcher.referential_words_as_tokens[standard_ref_word]) + 2,
-            ):
-                n_words_grams = words_matcher.n_grams_from_sentence_words(
-                    sentence_words, n_grams=n_grams
-                )
-                all_subsentences += [
-                    " ".join(n_words_gram) for n_words_gram in n_words_grams
-                ]
-                standardized_referential_words += [standard_ref_word] * len(
-                    n_words_grams
-                )
-                referential_words += [referential_word] * len(n_words_grams)
+            n_words_grams = words_matcher.n_grams_from_sentence_words(
+                sentence_words,
+                n_grams=len(
+                    words_matcher.referential_words_as_tokens[standard_ref_word]
+                ),
+            )
+            sub_sentences += [" ".join(n_words_gram) for n_words_gram in n_words_grams]
+            standardized_referential_words += [standard_ref_word] * len(n_words_grams)
+            referential_words += [referential_word] * len(n_words_grams)
 
         similarities_scores = words_matcher.similarities_from_word_pairs(
-            list(zip(standardized_referential_words, all_subsentences)),
+            list(zip(standardized_referential_words, sub_sentences)),
             words_matcher.similarity_type,
             multi_process=False,
         )
         similar_ref_words_idxs = np.where(
             np.array(similarities_scores) >= words_matcher.similarity_threshold
         )[0]
-        return (
-            [referential_words[idx] for idx in similar_ref_words_idxs],
-            [similarities_scores[idx] for idx in similar_ref_words_idxs],
-        )
+        return [
+            Match(
+                found_word=referential_words[idx],
+                matching_sub_sentence=sub_sentences[idx],
+                score=similarities_scores[idx],
+                sentence=standardized_sentence,
+            )
+            for idx in similar_ref_words_idxs
+        ]
+
+    @staticmethod
+    def filter_best_matches(matches: List[Match]):
+        best_matches = {}
+        for match in matches:
+            if (
+                match.found_word not in best_matches
+                or match.score > best_matches[match.found_word].score
+            ):
+                best_matches[match.found_word] = match
+        return list(best_matches.values())
 
     @staticmethod
     def standardize_word(word: str) -> str:
@@ -201,7 +188,6 @@ class WordsMatcher:
         word = word.replace(os.linesep, " ")
         word = word.lstrip()
         word = word.rstrip()
-        word = word.replace("-", " ")
         word = word.replace("é", "e")
         word = word.replace("è", "e")
         return word.lower()
