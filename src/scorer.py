@@ -1,140 +1,137 @@
-import os
-from dataclasses import dataclass
-from statistics import mean
-from typing import List, Optional
+from typing import List
 
-import numpy as np
-import pandas as pd
-from database.api.meta.country import get_all_countries
-from database.api.meta.material import get_all_materials
-from database.schemas.country import Country
-from database.schemas.material import Material
-from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
-from src.words_matcher import WordsMatcher
-
-HIGHER_IS_SOCIALLY_BETTER = [
-    f"{Country.situation}".split(".")[1],
-    f"{Country.corruption}".split(".")[1],
-    f"{Country.human_freedom_index}".split(".")[1],
-    f"{Country.global_food_security_index}".split(".")[1],
-    f"{Country.minimum_monthly_salary}".split(".")[1],
-]
-HIGHER_IS_SOCIALLY_WORSE = [
-    f"{Country.poverty_rate}".split(".")[1],
-]
-HIGHER_IS_ECOLOGY_BETTER = [
-    f"{Material.is_recyclable}".split(".")[1],
-    f"{Material.skin_friendlyness}".split(".")[1],
-]
-HIGHER_IS_ECOLOGY_WORSE = [
-    f"{Material.health_harmfulness}".split(".")[1],
-]
-# todo: check why column is named health_harmfulness and a high score there
-# todo: leads to a high overall score
-# todo: the column is possibly wrongly named
-
-DATABASE_API_URL = os.environ.get("DATABASE_API_URL")
+from src.interpreter import LabelCountry, LabelMaterial
 
 
-def get_countries_as_dataframe():
-    return pd.DataFrame(
-        data=get_all_countries(api_url=DATABASE_API_URL, serialize_as_python_obj=False)
-    )
+class Criteria:
+    environment = "environment"
+    societal = "societal"
+    animal = "animal"
+    health = "health"
 
 
-def get_materials_as_dataframe():
-    return pd.DataFrame(
-        data=get_all_materials(api_url=DATABASE_API_URL, serialize_as_python_obj=False)
-    )
+class AnimalScore(BaseModel):
+    value: float
 
 
-@dataclass
-class InterpretedScore:
-    score: float
+class EnvironmentScore(BaseModel):
+    value: float
+    nature: float
+    destruction: float
+    water: float
 
 
-def get_score_relative_to_other_elements(
-    element: pd.Series,
-    other_elements: pd.DataFrame,
-    positive_columns: List[str],
-    negative_columns: List[str],
-):
-    # each row is a different element and a serie
-    mins, maxs = other_elements.min(axis=0), other_elements.max(axis=0)
-    # keep only used columns
-    element = element.loc[positive_columns + negative_columns]
-    element[positive_columns] = (element[positive_columns] - mins[positive_columns]) / (
-        maxs[positive_columns] - mins[positive_columns]
-    )
-    element[negative_columns] = (maxs[negative_columns] - element[negative_columns]) / (
-        maxs[negative_columns] - mins[negative_columns]
-    )
-    return element.mean(skipna=True)
+class HealthScore(BaseModel):
+    value: float
+    treatment: float
+    benef: float
+
+
+class SocietalScore(BaseModel):
+    value: float
+    politique: float
+    human_rights: float
+    work: float
+
+
+class GlobalScore(BaseModel):
+    value: float
+    societal_score: SocietalScore
+    health_score: HealthScore
+    environment_score: EnvironmentScore
+    animal_score: AnimalScore
 
 
 class Scorer:
     def __init__(
         self,
-        ecology_importance: float = 1,
-        societal_importance: float = 1,
-        words_matcher: Optional[WordsMatcher] = None,
+        environment_ranking: float,
+        societal_ranking: float,
+        health_ranking: float,
+        animal_ranking: float,
     ):
-        self.ecology_importance = ecology_importance
-        self.societal_importance = societal_importance
-        self.words_matcher = (
-            words_matcher if words_matcher is not None else WordsMatcher()
-        )
-        self.df_countries = get_countries_as_dataframe().set_index("name")
-        self.df_materials = get_materials_as_dataframe().set_index("name")
+        self.environment_ranking = environment_ranking
+        self.societal_ranking = societal_ranking
+        self.health_ranking = health_ranking
+        self.animal_ranking = animal_ranking
 
-    def get_material_score(self, material: pd.Series) -> float:
-        return get_score_relative_to_other_elements(
-            element=material,
-            other_elements=self.df_materials,
-            positive_columns=HIGHER_IS_ECOLOGY_BETTER,
-            negative_columns=HIGHER_IS_ECOLOGY_WORSE,
-        )
+    @property
+    def environment_importance(self):
+        return 1 / self.environment_ranking
 
-    def ecology_score(self, label: str) -> float:
-        # materials = get_materials(db=self.db)
-        materials_in_label = set(
-            self.words_matcher.similar_referential_words_per_sentence(
-                sentences=[label], referential=[x for x in self.df_materials.index]
-            )[0][0]
-        )
-        return mean(
-            [
-                self.get_material_score(material=self.df_materials.loc[material_name])
-                for material_name in materials_in_label
-            ]
-        )
+    @property
+    def societal_importance(self):
+        return 1 / self.societal_ranking
 
-    def get_country_score(self, country: pd.Series) -> float:
-        return get_score_relative_to_other_elements(
-            element=country,
-            other_elements=self.df_countries,
-            positive_columns=HIGHER_IS_SOCIALLY_BETTER,
-            negative_columns=HIGHER_IS_SOCIALLY_WORSE,
+    @property
+    def health_importance(self):
+        return 1 / self.health_ranking
+
+    @property
+    def animal_importance(self):
+        return 1 / self.animal_ranking
+
+    def get_health_score(self, materials: List[LabelMaterial]):
+        materials = [x for x in materials if x.percentage is not None]
+        sum_weights = sum(x.percentage for x in materials)
+        return HealthScore(
+            value=sum(x.health * x.percentage for x in materials) / sum_weights,
+            treatment=sum(x.treatment * x.percentage for x in materials) / sum_weights,
+            benef=sum(x.benef * x.percentage for x in materials) / sum_weights,
         )
 
-    def societal_score(self, label: str) -> float:
-        countries_in_label = set(
-            self.words_matcher.similar_referential_words_per_sentence(
-                sentences=[label], referential=[x for x in self.df_countries.index]
-            )[0][0]
-        )
-        return mean(
-            [
-                self.get_country_score(country=self.df_countries.loc[country_name])
-                for country_name in countries_in_label
-            ]
+    def get_animal_score(self, materials: List[LabelMaterial]):
+        materials = [x for x in materials if x.percentage is not None]
+        sum_weights = sum(x.percentage for x in materials)
+        return AnimalScore(
+            value=sum(x.animal * x.percentage for x in materials) / sum_weights,
         )
 
-    def __call__(self, label: str):
-        # the scale on which ecology_importance and societal_importance is meaningless
+    def get_environment_score(self, materials: List[LabelMaterial]):
+        materials = [x for x in materials if x.percentage is not None]
+        sum_weights = sum(x.percentage for x in materials)
+        return EnvironmentScore(
+            value=sum(x.env * x.percentage for x in materials) / sum_weights,
+            nature=sum(x.nature * x.percentage for x in materials) / sum_weights,
+            destruction=sum(x.destruction * x.percentage for x in materials)
+            / sum_weights,
+            water=sum(x.water * x.percentage for x in materials) / sum_weights,
+        )
+
+    def get_societal_score(self, country: LabelCountry):
+        return SocietalScore(
+            value=country.societal,
+            politique=country.politique,
+            human_rights=country.human_rights,
+            work=country.work,
+        )
+
+    def __call__(
+        self, materials: List[LabelMaterial], country: LabelCountry
+    ) -> GlobalScore:
+        # the scale on which importances factors are is meaningless
         # the only thing that matters is the multiplication factor from one to the other
-        return (
-            self.ecology_importance * self.ecology_score(label)
-            + self.societal_importance * self.societal_score(label)
-        ) / (self.ecology_importance + self.societal_importance)
+        animal_score = self.get_animal_score(materials=materials)
+        health_score = self.get_health_score(materials=materials)
+        societal_score = self.get_societal_score(country=country)
+        environment_score = self.get_environment_score(materials=materials)
+        return GlobalScore(
+            value=(
+                animal_score.value * self.animal_importance
+                + health_score.value * self.health_importance
+                + societal_score.value * self.societal_importance
+                + environment_score.value * self.environment_importance
+            )
+            / (
+                self.animal_importance
+                + self.health_importance
+                + self.societal_importance
+                + self.environment_importance
+            ),
+            societal_score=societal_score,
+            health_score=health_score,
+            environment_score=environment_score,
+            animal_score=animal_score,
+        )

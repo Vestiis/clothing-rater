@@ -1,12 +1,18 @@
 import logging
 
 from fastapi import APIRouter, Body, Depends, HTTPException
-from sqlalchemy.orm import Session
 
 from src.app.crud.score import compute_score
 from src.app.schemas.score import LabelMessage, ScoreResponse
+from src.exceptions import (
+    CountryNotFound,
+    MaterialNotFound,
+    MissingMaterialPercentage,
+    TextNotFound,
+)
+from src.interpreter import Interpreter, get_interpreter
 from src.ocr import Ocr, get_ocr
-from src.words_matcher import WordsMatcher, get_words_matcher
+from src.scorer import Criteria
 
 router = APIRouter()
 
@@ -14,71 +20,54 @@ logger = logging.getLogger(__name__)
 
 
 class RouteType:
-    post_compute_score_from_image_bytes = "/post_compute_score_from_image_bytes"
-    post_compute_score_from_image_url = "/post_compute_score_from_image_url"
-    post_compute_score_from_image_label = "/post_compute_score_from_image_label"
+    post_compute_score = "/post_compute_score"
 
 
-@router.post(
-    RouteType.post_compute_score_from_image_bytes, response_model=ScoreResponse
-)
-def post_compute_score_from_image_bytes(
+def handle_error(exception: Exception):
+    if isinstance(exception, MaterialNotFound) or isinstance(
+        exception,
+        CountryNotFound
+        or isinstance(exception, TextNotFound)
+        or isinstance(exception, MissingMaterialPercentage),
+    ):
+        raise HTTPException(detail=str(exception), status_code=422)
+    else:
+        raise HTTPException(detail=str(exception), status_code=500)
+
+
+@router.post(RouteType.post_compute_score, response_model=ScoreResponse)
+def post_compute_score(
     *,
     score_message: LabelMessage = Body(..., embed=False),
     ocr: Ocr = Depends(get_ocr),
-    words_matcher: WordsMatcher = Depends(get_words_matcher),
-    # credentials: HTTPAuthorizationCredentials = Security(security) # would this work to have the uuid that would allow me to retrieve
+    interpreter: Interpreter = Depends(get_interpreter),
+    # credentials: HTTPAuthorizationCredentials = Security(security)
+    # would this work to have the uuid that would allow me to retrieve
     # info about the user?
 ):
     try:
-        clothing_score = compute_score(
-            label=" ".join(ocr(image_bytes=x) for x in score_message.images),
-            words_matcher=words_matcher,
-            ecology_importance=1,
-            societal_importance=1,
+        if score_message.images_labels is not None:
+            labels = score_message.images_labels
+        elif score_message.images_urls is not None:
+            labels = [ocr(image_url=x) for x in score_message.images_urls]
+        elif score_message.images is not None:
+            labels = [ocr(image_bytes=x) for x in score_message.images]
+        else:
+            raise Exception(
+                f"At least one of "
+                f"{LabelMessage.images_labels} {LabelMessage.images_urls} "
+                f"{LabelMessage.images} fields must be provided"
+            )
+        clothing_score, materials, country = compute_score(
+            label=" ".join(labels),
+            interpreter=interpreter,
+            environment_ranking=score_message.preferences.index(Criteria.environment)
+            + 1,
+            societal_ranking=score_message.preferences.index(Criteria.societal) + 1,
+            animal_ranking=score_message.preferences.index(Criteria.animal) + 1,
+            health_ranking=score_message.preferences.index(Criteria.health) + 1,
+            return_found_elements=True,
         )
-        return ScoreResponse(score=clothing_score)
+        return ScoreResponse(score=clothing_score, materials=materials, country=country)
     except Exception as e:
-        logger.error(e)
-        raise HTTPException(detail=str(e), status_code=500)
-
-
-@router.post(RouteType.post_compute_score_from_image_url, response_model=ScoreResponse)
-def post_compute_score_from_image_url(
-    *,
-    score_message: LabelMessage = Body(..., embed=False),
-    ocr: Ocr = Depends(get_ocr),
-    words_matcher: WordsMatcher = Depends(get_words_matcher),
-):
-    try:
-        clothing_score = compute_score(
-            label=" ".join(ocr(image_url=x) for x in score_message.images_urls),
-            words_matcher=words_matcher,
-            ecology_importance=1,
-            societal_importance=1,
-        )
-        return ScoreResponse(score=clothing_score)
-    except Exception as e:
-        logger.error(e)
-        raise HTTPException(detail=str(e), status_code=500)
-
-
-@router.post(
-    RouteType.post_compute_score_from_image_label, response_model=ScoreResponse
-)
-def post_compute_score_from_image_label(
-    *,
-    score_message: LabelMessage = Body(..., embed=False),
-    words_matcher: WordsMatcher = Depends(get_words_matcher),
-):
-    try:
-        clothing_score = compute_score(
-            label=" ".join(x for x in score_message.images_labels),
-            words_matcher=words_matcher,
-            ecology_importance=1,
-            societal_importance=1,
-        )
-        return ScoreResponse(score=clothing_score)
-    except Exception as e:
-        logger.error(e)
-        raise HTTPException(detail=str(e), status_code=500)
+        handle_error(e)
