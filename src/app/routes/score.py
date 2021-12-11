@@ -24,11 +24,11 @@ class RouteType:
 
 
 def handle_error(exception: Exception):
-    if isinstance(exception, MaterialNotFound) or isinstance(
-        exception,
-        CountryNotFound
+    if (
+        isinstance(exception, MaterialNotFound)
+        or isinstance(exception, CountryNotFound)
         or isinstance(exception, TextNotFound)
-        or isinstance(exception, MissingMaterialPercentage),
+        or isinstance(exception, MissingMaterialPercentage)
     ):
         raise HTTPException(detail=str(exception), status_code=422)
     else:
