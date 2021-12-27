@@ -36,7 +36,13 @@ def http_call_url(host_url: str, api_app_port: Optional[int] = None):
 
 
 def request_data(images: List[str]):
-    return json.dumps(SentMessage(images=images).dict())
+    return json.dumps(
+        SentMessage(
+            images=images,
+            user_id="dummy_user_id",
+            preferences=["environment", "societal", "animal", "health"],
+        ).dict()
+    )
 
 
 def build_full_route(route: str):
