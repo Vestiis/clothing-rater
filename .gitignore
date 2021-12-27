@@ -1,5 +1,7 @@
 *.pem
 .idea
+*.jpg
+*.png
 env
 clothing_rater.egg-info
 code_tests.py
