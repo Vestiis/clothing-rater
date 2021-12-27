@@ -44,7 +44,7 @@ setup(
         "uvicorn==0.15.0",
         "clothing-rater-database-api @ git+ssh://git@github.com/yohskua/clothing-rater-database-api.git#egg=database",
         "Pillow==8.4.0",
-        "python-magic-bin==0.4.14",
+        "python-magic==0.4.24",
         "pyheif==0.6.1",
     ],
     # List additional groups of dependencies here (e.g. development
