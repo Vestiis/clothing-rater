@@ -7,7 +7,7 @@ RUN apt-get update && \
     apt-get install -y \
     git \
     openssh-server && \
-    apt-get dist-upgrade -y
+    apt-get dist-upgrade -y libmagic1
 
 # Authorize SSH Host
 RUN mkdir -p /root/.ssh && \
