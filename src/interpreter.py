@@ -91,7 +91,8 @@ class Interpreter:
         if look_left_first is None:
             look_left_first = True
         expressions = [
-            "{} ?(\d+) ?% ?{}",  # if material next to percentage
+            # "{} ?(\d+) ?% ?{}",  # if material next to percentage
+            "{}[^0-9]*(\d+) ?%[^0-9]*{}"  # if material and its translations are next to percentage
         ]
         if look_left_first:
             args = ["", label_material]
@@ -103,7 +104,7 @@ class Interpreter:
         # try look on one side
         for expression in expressions:
             if matches := re.findall(expression.format(*args), label):
-                return matches[0], found_on_left
+                return float(matches[0]), found_on_left
 
         # try look on the other side
         args = args[::-1]
