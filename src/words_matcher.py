@@ -10,7 +10,7 @@ from typing import List, Sequence, Tuple, Union
 import numpy as np
 from nltk.tokenize import word_tokenize
 
-from src.config import WordsMatcherConfig
+from src.config import Config
 from src.utils import chunks
 
 logger = logging.getLogger(__name__)
@@ -269,8 +269,8 @@ class WordsMatcher:
 # @lru_cache
 def get_words_matcher():
     return WordsMatcher(
-        similarity_type=WordsMatcherConfig.similarity_type,
-        tokenization_type=WordsMatcherConfig.tokenization_type,
-        extract_with_multi_process=WordsMatcherConfig.extract_with_multi_process,
-        similarity_threshold=WordsMatcherConfig.similarity_threshold,
+        similarity_type=Config.WordsMatcher.similarity_type,
+        tokenization_type=Config.WordsMatcher.tokenization_type,
+        extract_with_multi_process=Config.WordsMatcher.extract_with_multi_process,
+        similarity_threshold=Config.WordsMatcher.similarity_threshold,
     )
