@@ -1,6 +1,6 @@
 class Config:
     class Ocr:
-        pixels_per_image = 400 * 400
+        pixels_per_image = 640 * 480
 
     class WordsMatcher:
         similarity_type = "difflib"
