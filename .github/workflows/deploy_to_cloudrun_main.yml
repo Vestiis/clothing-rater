@@ -51,3 +51,9 @@ jobs:
             --image ${{ env.REGISTRY_IMAGE_NAME }}:${{ github.sha }} \
             --platform "managed" \
             --quiet
+      - name: Root traffic to latest revision
+        run: |
+          gcloud run services update-traffic ${{ env.SERVICE }} \
+            --to-latest --platform "managed" \
+            --region ${{ env.REGION }} \
+            --quiet
