@@ -3,8 +3,7 @@ import itertools
 import logging
 import multiprocessing
 import os
-from dataclasses import dataclass
-from functools import lru_cache, partial
+from functools import partial
 from typing import List, Sequence, Tuple, Union
 
 import numpy as np
@@ -12,16 +11,50 @@ from nltk.tokenize import word_tokenize
 
 from src.config import Config
 from src.utils import chunks
+from src.words_matcher.match import Match, MatchFilter, OverlappingMatches
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class Match:
-    found_word: str
-    matching_sub_sentence: str
-    score: float
-    sentence: str
+def filter_same_location_matches(
+    matches: List[Match], filter_on: str = MatchFilter.longest
+):
+    overlaps = []
+    for match in matches:
+        for overlap in overlaps:
+            if overlap.match_overlaps(match):
+                overlap.add(match)
+                continue
+        overlaps.append(
+            OverlappingMatches(
+                left_bound=match.start, right_bound=match.end, matches=[match]
+            )
+        )
+    if filter_on == MatchFilter.longest:
+        return [
+            sorted(
+                overlap.matches, key=lambda match: len(match.found_word), reverse=True
+            )[0]
+            for overlap in overlaps
+        ]
+    elif filter_on == MatchFilter.best:
+        return [
+            sorted(overlap.matches, key=lambda match: len(match.score), reverse=True)[0]
+            for overlap in overlaps
+        ]
+    else:
+        raise NotImplementedError
+
+
+def filter_best_matches(matches: List[Match]):
+    best_matches = {}
+    for match in matches:
+        if (
+            match.found_word not in best_matches
+            or match.score > best_matches[match.found_word].score
+        ):
+            best_matches[match.found_word] = match
+    return list(best_matches.values())
 
 
 class WordsMatcher:
@@ -53,7 +86,7 @@ class WordsMatcher:
             return lambda x: x.split(" ")
         if self.tokenization_type == "word_tokenize":
             return word_tokenize
-        raise NotADirectoryError
+        raise NotImplementedError
 
     def tokenize(self, x: str):
         return self.tokenization_func(x)
@@ -75,10 +108,22 @@ class WordsMatcher:
         ]
 
     def find_words_in_sentences(
-        self, sentences: Sequence[str], referential: Sequence[str],
+        self,
+        sentences: Sequence[str],
+        referential: Sequence[str],
+        keep_best_same_match: bool = True,
+        filter_same_location_match: bool = True,
+        filter_same_location_match_on: str = MatchFilter.longest,
     ) -> Tuple[List[List[str]], List[List[float]]]:
         if not self.extract_with_multi_process:
-            return self._find_words_in_sentences(sentences, self, referential)
+            return self._find_words_in_sentences(
+                sentences,
+                self,
+                referential,
+                keep_best_same_match=keep_best_same_match,
+                filter_same_location_match=filter_same_location_match,
+                filter_same_location_match_on=filter_same_location_match_on,
+            )
         processes = multiprocessing.cpu_count()
         logger.info(
             f"Extraction of similar referential words has been required"
@@ -91,6 +136,9 @@ class WordsMatcher:
                 self._find_words_in_sentences,
                 words_matcher=self,
                 referential=referential,
+                keep_best_same_match=keep_best_same_match,
+                filter_same_location_match=filter_same_location_match,
+                filter_same_location_match_on=filter_same_location_match_on,
             ),
             chunks(elems=sentences, chunk_size=len(sentences) // processes),
         )
@@ -103,12 +151,20 @@ class WordsMatcher:
         sentences: Sequence[str],
         words_matcher: "WordsMatcher",
         referential: Sequence[str],
+        keep_best_same_match: bool = True,
+        filter_same_location_match: bool = True,
+        filter_same_location_match_on: str = MatchFilter.longest,
     ) -> Tuple[List[List[str]], List[List[float]]]:
 
         matches_per_sentence = []
         for sentence in sentences:
             (matches) = WordsMatcher._find_words_in_sentence(
-                words_matcher, sentence, referential
+                words_matcher,
+                sentence,
+                referential,
+                keep_best_same_match=keep_best_same_match,
+                filter_same_location_match=filter_same_location_match,
+                filter_same_location_match_on=filter_same_location_match_on,
             )
 
             matches_per_sentence.append(matches)
@@ -117,7 +173,12 @@ class WordsMatcher:
 
     @staticmethod
     def _find_words_in_sentence(
-        words_matcher: "WordsMatcher", sentence: str, referential: Sequence[str],
+        words_matcher: "WordsMatcher",
+        sentence: str,
+        referential: Sequence[str],
+        keep_best_same_match: bool = True,
+        filter_same_location_match: bool = True,
+        filter_same_location_match_on: str = MatchFilter.longest,
     ) -> List[Match]:
         """Finds the referential words that are found in sentence with a similarity above some threshold parameter
 
@@ -158,7 +219,7 @@ class WordsMatcher:
         similar_ref_words_idxs = np.where(
             np.array(similarities_scores) >= words_matcher.similarity_threshold
         )[0]
-        return [
+        matches = [
             Match(
                 found_word=referential_words[idx],
                 matching_sub_sentence=sub_sentences[idx],
@@ -167,17 +228,13 @@ class WordsMatcher:
             )
             for idx in similar_ref_words_idxs
         ]
-
-    @staticmethod
-    def filter_best_matches(matches: List[Match]):
-        best_matches = {}
-        for match in matches:
-            if (
-                match.found_word not in best_matches
-                or match.score > best_matches[match.found_word].score
-            ):
-                best_matches[match.found_word] = match
-        return list(best_matches.values())
+        if keep_best_same_match:
+            matches = filter_best_matches(matches)
+        if filter_same_location_match:
+            matches = filter_same_location_matches(
+                matches, filter_on=filter_same_location_match_on
+            )
+        return matches
 
     @staticmethod
     def standardize_word(word: str) -> str:
@@ -221,7 +278,6 @@ class WordsMatcher:
             return WordsMatcher._similarities_from_word_pairs(
                 word_pairs, similarity_type
             )
-        # processes = multiprocessing.cpu_count() - 1
         processes = multiprocessing.cpu_count()
         pool = multiprocessing.Pool(processes=processes)
         similarities = pool.map(
