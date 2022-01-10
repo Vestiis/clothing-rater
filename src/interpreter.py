@@ -1,7 +1,6 @@
 import json
 import os
 import re
-from dataclasses import dataclass
 from typing import List, Optional
 
 from database.api.meta.country import get_all_countries
@@ -11,9 +10,11 @@ from database.api.schemas.material import Material
 from fastapi import Depends
 
 from src import DATABASE_API_URL
+from src.config import Config
 from src.exceptions import (CountryNotFound, MaterialNotFound,
                             MissingMaterialPercentage)
-from src.words_matcher import WordsMatcher, get_words_matcher
+from src.words_matcher.match import MatchFilter
+from src.words_matcher.words_matcher import WordsMatcher, get_words_matcher
 
 
 class LabelMaterial(Material):
@@ -45,7 +46,12 @@ def handle_country_exceptions(country: Optional[LabelCountry]):
 
 
 def standardize(label: str):
-    return label.replace(os.linesep, " ")
+    label = label.replace(os.linesep, " ").lower()
+    # if "made in" without space next to it then add a space next to it
+    if matches := re.findall("(made in[^ ])", label):
+        for match in matches:
+            label = label.replace(match, f"{match[:-1]} {match[-1]}")
+    return label
 
 
 class Interpreter:
@@ -55,6 +61,7 @@ class Interpreter:
         countries: List[Country],
         similarity_threshold: float = 0.85,
         words_matcher: WordsMatcher = None,
+        filter_overlapping_materials_on: str = MatchFilter.longest
     ):
         self.words_matcher = (
             words_matcher
@@ -63,6 +70,7 @@ class Interpreter:
         )
         self.materials = materials
         self.countries = countries
+        self.filter_overlapping_materials_on = filter_overlapping_materials_on
 
         self.spelling_to_material: dict = None
         self.spelling_to_country: dict = None
@@ -73,12 +81,12 @@ class Interpreter:
 
     def _build(self):
         self.spelling_to_material = {
-            spelling: material
+            standardize(spelling): material
             for material in self.materials
             for spelling in material.names
         }
         self.spelling_to_country = {
-            spelling: country
+            standardize(spelling): country
             for country in self.countries
             for spelling in country.names
         }
@@ -91,7 +99,6 @@ class Interpreter:
         if look_left_first is None:
             look_left_first = True
         expressions = [
-            # "{} ?(\d+) ?% ?{}",  # if material next to percentage
             "{}[^0-9]*(\d+) ?%[^0-9]*{}"  # if material and its translations are next to percentage
         ]
         if look_left_first:
@@ -119,13 +126,15 @@ class Interpreter:
         label_materials = dict()
         label = standardize(label)
         matches = self.words_matcher.find_words_in_sentences(
-            sentences=[label], referential=self.material_names
+            sentences=[label],
+            referential=self.material_names,
+            keep_best_same_match=True,
+            filter_same_location_match=True,
+            filter_same_location_match_on=self.filter_overlapping_materials_on,
         )[0]
-        matches = self.words_matcher.filter_best_matches(matches)
-        # sort matches from first found in text in last in text
-        matches = sorted(
-            matches, key=lambda match: match.sentence.find(match.matching_sub_sentence)
-        )
+
+        # sort matches from first found in text to last found in text
+        matches = sorted(matches, key=lambda match: match.start)
         look_left_first = None
         for match in matches:
             percentage, found_on_left = self._find_material_percentage(
@@ -152,9 +161,11 @@ class Interpreter:
     def find_country(self, label: str):
         label = standardize(label)
         matches = self.words_matcher.find_words_in_sentences(
-            sentences=[label], referential=self.country_names
+            sentences=[label],
+            referential=self.country_names,
+            keep_best_same_match=True,
+            filter_same_location_match=False,
         )[0]
-        matches = self.words_matcher.filter_best_matches(matches)
         # select country that is found first in text
         matches = sorted(
             matches, key=lambda match: match.sentence.find(match.matching_sub_sentence)
@@ -169,7 +180,9 @@ class Interpreter:
         return country
 
 
-def get_interpreter(words_matcher: WordsMatcher = Depends(get_words_matcher)) -> Interpreter:
+def get_interpreter(
+    words_matcher: WordsMatcher = Depends(get_words_matcher),
+) -> Interpreter:
     interpreter = Interpreter(
         materials=get_all_materials(
             api_url=DATABASE_API_URL, serialize_as_python_obj=True
@@ -177,6 +190,7 @@ def get_interpreter(words_matcher: WordsMatcher = Depends(get_words_matcher)) ->
         countries=get_all_countries(
             api_url=DATABASE_API_URL, serialize_as_python_obj=True
         ),
-        words_matcher=words_matcher
+        words_matcher=words_matcher,
+        filter_overlapping_materials_on=Config.Interpreter.filter_overlapping_materials_on
     )
     return interpreter
