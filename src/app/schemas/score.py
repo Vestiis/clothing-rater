@@ -24,6 +24,7 @@ class LabelMessage(BaseModel):
 
 
 class ScoreResponse(BaseModel):
+    label: str
     score: GlobalScore
     materials: List[LabelMaterial]
     country: LabelCountry

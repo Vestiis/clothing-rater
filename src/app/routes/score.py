@@ -58,8 +58,9 @@ def post_compute_score(
                 f"{LabelMessage.images_labels} {LabelMessage.images_urls} "
                 f"{LabelMessage.images} fields must be provided"
             )
+        label = " ".join(labels)
         clothing_score, materials, country = compute_score(
-            label=" ".join(labels),
+            label=label,
             interpreter=interpreter,
             environment_ranking=score_message.preferences.index(Criteria.environment)
             + 1,
@@ -68,6 +69,8 @@ def post_compute_score(
             health_ranking=score_message.preferences.index(Criteria.health) + 1,
             return_found_elements=True,
         )
-        return ScoreResponse(score=clothing_score, materials=materials, country=country)
+        return ScoreResponse(
+            label=label, score=clothing_score, materials=materials, country=country
+        )
     except Exception as e:
         handle_error(e)
