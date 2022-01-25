@@ -14,3 +14,4 @@ clothing_rater_id_rsa.pub
 env_variables
 **/__pycache__
 sample_labels
+debug
