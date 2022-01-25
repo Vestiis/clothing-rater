@@ -57,8 +57,8 @@ def post_compute_score(
     authorization_token: Optional[str] = None,
     timeout: int = 3600,
 ):
-    if authorization_token is None:
-        authorization_token = GoogleInterface().generate_id_token()
+    if not api_url.startswith("http://localhost") and authorization_token is None:
+        authorization_token = GoogleInterface().generate_id_token(audience=api_url)
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {authorization_token}",

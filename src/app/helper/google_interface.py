@@ -12,7 +12,7 @@ class GoogleInterface:
     def __init__(self):
 
         self.request = google.auth.transport.requests.Request()
-        self.target_audience = "https://clothing-rater-api-n7s7fuxxna-ew.a.run.app"
+        self.current_audience = None
 
     def current_service_account_email(self):
         try:
@@ -28,7 +28,7 @@ class GoogleInterface:
 
         # Generate an id_token with de current ENV SERVICE ACCOUNT
 
-        aud = audience if audience is not None else self.target_audience
+        aud = audience if audience is not None else self.current_audience
 
         open_id_connect_token = id_token.fetch_id_token(self.request, aud)
 
@@ -44,7 +44,7 @@ class GoogleInterface:
 
             if (
                 result
-                and result["aud"] == self.target_audience
+                and result["aud"] == self.current_audience
                 and result["email"] in self.current_service_account_email()
             ):
 
