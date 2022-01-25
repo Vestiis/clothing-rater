@@ -46,6 +46,7 @@ setup(
         "Pillow==8.4.0",
         "python-magic==0.4.24",
         "pyheif==0.6.1",
+        "pytest==6.2.5",
     ],
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"

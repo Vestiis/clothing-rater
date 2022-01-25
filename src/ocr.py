@@ -14,7 +14,7 @@ from src.exceptions import TextNotFound
 
 
 class Ocr:
-    def __init__(self, pixels_per_image: int = 400 * 400):
+    def __init__(self, pixels_per_image: int = 640 * 480):
         self.client_vision = vision.ImageAnnotatorClient()
         self.pixels_per_image = pixels_per_image
 

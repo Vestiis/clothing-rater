@@ -16,6 +16,12 @@ from src.exceptions import (CountryNotFound, MaterialNotFound,
 from src.words_matcher.match import MatchFilter
 from src.words_matcher.words_matcher import WordsMatcher, get_words_matcher
 
+ADD_SPACE_ELEMENTS = [
+    "made in",
+    "/",
+    "%",
+]
+
 
 class LabelMaterial(Material):
     percentage: Optional[float]
@@ -37,21 +43,14 @@ def handle_material_exceptions(materials: List[LabelMaterial]):
     for material in materials:
         if material.percentage is None:
             raise MissingMaterialPercentage(material=material.names[0])
+    # if sum(material.percentage for material in materials) < 100:
+        # raise MissingMaterials("Missing materials, less than 100% composition")
 
 
 # dummy
 def handle_country_exceptions(country: Optional[LabelCountry]):
     if country is None:
         raise CountryNotFound
-
-
-def standardize(label: str):
-    label = label.replace(os.linesep, " ").lower()
-    # if "made in" without space next to it then add a space next to it
-    if matches := re.findall("(made in[^ ])", label):
-        for match in matches:
-            label = label.replace(match, f"{match[:-1]} {match[-1]}")
-    return label
 
 
 class Interpreter:
@@ -79,14 +78,35 @@ class Interpreter:
 
         self._build()
 
+    @staticmethod
+    def _standardize_label(label: str):
+        label = label.replace(os.linesep, " ").lower()
+        for element in ADD_SPACE_ELEMENTS:
+            label = label.replace(element, f" {element} ")
+        # replace all trailing whitespaces by a single whitespace
+        label = re.sub("[ ]{2,}", " ", label)
+        # if "made in" without space next to it then add a space next to it
+        # if matches := re.findall("(made in[^ ])", label):
+        #     for match in matches:
+        #         label = label.replace(match, f"{match[:-1]} {match[-1]}")
+        return label
+
+    @staticmethod
+    def _standardize_material_name(material_name: str):
+        return material_name.lower()
+
+    @staticmethod
+    def _standardize_country_name(country_name: str):
+        return country_name.lower()
+
     def _build(self):
         self.spelling_to_material = {
-            standardize(spelling): material
+            self._standardize_material_name(spelling): material
             for material in self.materials
             for spelling in material.names
         }
         self.spelling_to_country = {
-            standardize(spelling): country
+            self._standardize_country_name(spelling): country
             for country in self.countries
             for spelling in country.names
         }
@@ -124,7 +144,7 @@ class Interpreter:
 
     def find_materials(self, label: str):
         label_materials = dict()
-        label = standardize(label)
+        label = self._standardize_label(label)
         matches = self.words_matcher.find_words_in_sentences(
             sentences=[label],
             referential=self.material_names,
@@ -159,7 +179,10 @@ class Interpreter:
         return label_materials
 
     def find_country(self, label: str):
-        label = standardize(label)
+        label = self._standardize_label(label)
+        # faire en sorte  de d'abord chercher un terme clé style "made in {country}"
+        # avant de procéder autrement
+
         matches = self.words_matcher.find_words_in_sentences(
             sentences=[label],
             referential=self.country_names,
