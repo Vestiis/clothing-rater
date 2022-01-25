@@ -7,7 +7,7 @@ setup(
     name="clothing-rater",
     # Project version.
     version="1.0.0",
-    python_requires="==3.8.10",
+    python_requires="==3.8.*",
     # This is a one-line description or tagline of what your project does. This
     # corresponds to the "Summary" metadata field:
     # https://packaging.python.org/specifications/core-metadata/#summary
