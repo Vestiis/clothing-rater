@@ -21,7 +21,7 @@ class Ocr:
     @staticmethod
     def set_image_format_for_google_ocr(image_bytes: List[bytes]):
         # if file is of HEIC format then convert it to jpeg
-        if magic.from_buffer(image_bytes) == "ISO Media":
+        if "ISO Media" in magic.from_buffer(image_bytes):
             tmp_file = tempfile.NamedTemporaryFile().name
             heif_file = pyheif.read(image_bytes)
             Image.frombytes(
