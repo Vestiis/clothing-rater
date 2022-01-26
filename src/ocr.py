@@ -1,4 +1,5 @@
 import io
+import logging
 import math
 import tempfile
 from typing import List, Optional
@@ -12,6 +13,10 @@ from PIL import Image
 from src.config import Config
 from src.exceptions import TextNotFound
 
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 class Ocr:
     def __init__(self, pixels_per_image: int = 640 * 480):
@@ -22,6 +27,10 @@ class Ocr:
     def set_image_format_for_google_ocr(image_bytes: List[bytes]):
         # if file is of HEIC format then convert it to jpeg
         if "ISO Media" in magic.from_buffer(image_bytes):
+            logger.warning(
+                "Image is of ISO Media magic package file type, "
+                "modifying it to another format"
+            )
             tmp_file = tempfile.NamedTemporaryFile().name
             heif_file = pyheif.read(image_bytes)
             Image.frombytes(
