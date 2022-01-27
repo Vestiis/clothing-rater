@@ -11,8 +11,6 @@ from fastapi import Depends
 
 from src import DATABASE_API_URL
 from src.config import Config
-from src.exceptions import (CountryNotFound, MaterialNotFound,
-                            MissingMaterialPercentage)
 from src.words_matcher.match import MatchFilter
 from src.words_matcher.words_matcher import WordsMatcher, get_words_matcher
 
@@ -35,22 +33,6 @@ class LabelMaterial(Material):
 
 class LabelCountry(Country):
     pass
-
-
-def handle_material_exceptions(materials: List[LabelMaterial]):
-    if not materials:
-        raise MaterialNotFound
-    for material in materials:
-        if material.percentage is None:
-            raise MissingMaterialPercentage(material=material.names[0])
-    # if sum(material.percentage for material in materials) < 100:
-        # raise MissingMaterials("Missing materials, less than 100% composition")
-
-
-# dummy
-def handle_country_exceptions(country: Optional[LabelCountry]):
-    if country is None:
-        raise CountryNotFound
 
 
 class Interpreter:
@@ -113,8 +95,9 @@ class Interpreter:
         self.material_names = list(self.spelling_to_material.keys())
         self.country_names = list(self.spelling_to_country.keys())
 
+    @staticmethod
     def _find_material_percentage(
-        self, label: str, label_material: str, look_left_first: Optional[bool] = None
+        label: str, label_material: str, look_left_first: Optional[bool] = None
     ):
         if look_left_first is None:
             look_left_first = True
@@ -175,31 +158,34 @@ class Interpreter:
             LabelMaterial(**material.dict(), percentage=percentage)
             for material, percentage in label_materials.items()
         ]
-        handle_material_exceptions(materials=label_materials)
         return label_materials
 
     def find_country(self, label: str):
         label = self._standardize_label(label)
-        # faire en sorte  de d'abord chercher un terme clé style "made in {country}"
-        # avant de procéder autrement
-
         matches = self.words_matcher.find_words_in_sentences(
             sentences=[label],
             referential=self.country_names,
             keep_best_same_match=True,
             filter_same_location_match=False,
         )[0]
-        # select country that is found first in text
-        matches = sorted(
-            matches, key=lambda match: match.sentence.find(match.matching_sub_sentence)
-        )
-        if matches:
+        country = None
+        # select in priority the country which corresponds to a regex
+        # of which we are sure
+        for match in matches:
+            # check if the part of the sentence corresponding to a country
+            # is next to the words 'made in'
+            if re.findall(f"made in ?{match.matching_sub_sentence}", label):
+                country = LabelCountry(
+                    **self.spelling_to_country[match.found_word].dict()
+                )
+        if matches and country is None:
+            # select country that is found first in text
+            matches = sorted(
+                matches, key=lambda match: match.sentence.find(match.matching_sub_sentence)
+            )
             country = LabelCountry(
                 **self.spelling_to_country[matches[0].found_word].dict()
             )
-        else:
-            country = None
-        handle_country_exceptions(country=country)
         return country
 
 

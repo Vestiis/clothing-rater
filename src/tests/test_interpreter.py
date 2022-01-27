@@ -38,7 +38,7 @@ COUNTRIES, MATERIALS_NAMES, LABELS = [
             # https://storage.googleapis.com/public-labels/9ac3dbf4-2434-4c58-9a69-49b877b5e470.JPG
             # https://storage.googleapis.com/public-labels/bfb9c540-b274-4a03-a833-96b990d811df.JPG
             (
-                "sri lanka",
+                "bulgaria",
                 ["polyester", "laine", "elasthanne", "viscose"],
                 "FR\nTissu principal\n56% polyester\n41% laine\n3% elasthanne\n100% viscose\nDoublure\nGB\nUS\nMain fabric\n56% polyester\n41% wool\n3% elastane\n100% viscose\nLining\nES\nTejido principal\n58% poliéster\n41% lana\n3% elastano\n100% viscosa\nForro\nDE\nHauptstoff\n56% polyester\n41% wolle\n3% elasthan\n100% viskose\nFutter\nNL\nHoofdstof\n56% polyester\n41% wol\n3% elastaan\n100% viscose\nVoering\nIT\nTessuto\nprincipale\n56% pollestere\n41% lana\n3% elastam\n100% viscosa\nFodera\nSE\nHuvudtyg\n56% polyester\n41% ylle\n3% elastan\n100% viskos\nFoder\nDK\nHovedstof\n50% polyester\n41% uld\n3% olastan\n100% viekose\nFor\nRU\nnonsaorep\nPT\nTecido principal\n50% poloster\n41% ia\n3% elastano\n100% viscose\nForro\n gje\nMADE INBULGARIA\n",
             ),
@@ -84,7 +84,7 @@ COUNTRIES, MATERIALS_NAMES, LABELS = [
             ),
             # "https://storage.googleapis.com/public-labels/IMG_9186.HEIC"
             (
-                "BANGLADESCH",
+                "bangladesh",
                 ["POLYESTER", "ELASTANE", "ACRYLIQUE"],
                 "FABRICADO EN BANGLADESH/\nFABRICADO NA BANGLADECHE I\nHERGESTELLT IN BANGLADESCH/\nFABRIQUÉ EN BANGLADESH\nGEPRODUCEERD IN BANGLADESH/\nPRODOTTO IN BANGLADESH/\nWYPRODUKOWANO W\nBANGLADESZUI\nIZDELANO V BANGLADESU/\nVYROBENO V BANGLADÉSI\nA'AX\n國 的。\n30\n30C\n72% ACRYLIC / ACRÍLICO/\nACRYL/ ACRYLIQUE /\nACRILICO / AKRYLI AKRIL\n25% POLYESTER / POLIÉSTER/\nPOLIESTERE / POLIESTER\n3% ELASTANE / ELASTANO\nELASTHAN / ÉLASTHANNE\nELASTAAN / ELASTAN\nCOLOU\nCOLUR\nAR AS\n",
             ),
@@ -128,3 +128,14 @@ def test_interpreter_find_materials(
         assert any(name in materials_names for name in material.names)
     for material_name in materials_names:
         assert any(material_name in material.names for material in materials)
+
+
+@pytest.mark.parametrize("country, label", list(zip(COUNTRIES, LABELS)))
+def test_interpreter_find_country(
+    interpreter: Interpreter, country: List[str], label: str
+):
+    found_country = interpreter.find_country(label=label)
+    if found_country is not None or country is not None:
+        assert Interpreter._standardize_country_name(country) in [
+            Interpreter._standardize_country_name(name) for name in found_country.names
+        ]
