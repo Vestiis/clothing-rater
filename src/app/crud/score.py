@@ -1,31 +1,60 @@
 from typing import List, Optional, Tuple, Union
 
-from src.exceptions import CountryNotFound, MaterialNotFound, MissingMaterialPercentage
+from src.exceptions import (
+    CountryNotFound,
+    MaterialNotFound,
+    MissingMaterialPercentage,
+    MultipleLabelErrors,
+)
 from src.interpreter import Interpreter, LabelCountry, LabelMaterial
 from src.scorer import GlobalScore, Scorer
 
 
-def handle_material_exceptions(found_materials: List[LabelMaterial]):
+def get_material_exceptions(found_materials: List[LabelMaterial]):
     if not found_materials:
-        raise MaterialNotFound
-    for material in found_materials:
-        if material.percentage is None:
-            raise MissingMaterialPercentage(material=material.names[0])
+        return [MaterialNotFound()]
+    return [
+        MissingMaterialPercentage(material=material.names[0])
+        for material in found_materials
+        if material.percentage is None
+    ]
     # if sum(material.percentage for material in materials) < 100:
     # raise MissingMaterials("Missing materials, less than 100% composition")
 
 
-# dummy
-def handle_country_exceptions(found_country: Optional[LabelCountry]):
+def get_country_exception(found_country: Optional[LabelCountry]):
     if found_country is None:
-        raise CountryNotFound
+        return CountryNotFound()
 
 
 def handle_interpreter_exceptions(
     found_materials: List[LabelMaterial], found_country: Optional[LabelCountry]
 ):
-    handle_material_exceptions(found_materials=found_materials)
-    handle_country_exceptions(found_country=found_country)
+    exceptions = []
+    material_excs = get_material_exceptions(found_materials=found_materials)
+    if material_excs:
+        exceptions += material_excs
+    country_exc = get_country_exception(found_country=found_country)
+    if country_exc:
+        exceptions.append(country_exc)
+    if not exceptions:
+        pass
+    elif len(exceptions) == 1:
+        raise exceptions[0]
+    else:
+        raise MultipleLabelErrors(
+            material_not_found_exc=[
+                exc for exc in exceptions if isinstance(exc, MaterialNotFound)
+            ][0]
+            if any(isinstance(exc, MaterialNotFound) for exc in exceptions)
+            else None,
+            missing_percentage_excs=[
+                exc for exc in exceptions if isinstance(exc, MissingMaterialPercentage)
+            ]
+            if any(isinstance(exc, MissingMaterialPercentage) for exc in exceptions)
+            else None,
+            country_not_found_exc=country_exc if country_exc is not None else None,
+        )
 
 
 def compute_score(

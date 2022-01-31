@@ -8,6 +8,7 @@ from src.exceptions import (
     CountryNotFound,
     MaterialNotFound,
     MissingMaterialPercentage,
+    MultipleLabelErrors,
     TextNotFound,
 )
 from src.interpreter import Interpreter, get_interpreter
@@ -29,6 +30,7 @@ def handle_error(exception: Exception):
         or isinstance(exception, CountryNotFound)
         or isinstance(exception, TextNotFound)
         or isinstance(exception, MissingMaterialPercentage)
+        or isinstance(exception, MultipleLabelErrors)
     ):
         raise HTTPException(detail=str(exception), status_code=422)
     else:
