@@ -7,6 +7,7 @@ import requests
 from pydantic import validator
 
 from src.app.helper.google_interface import GoogleInterface
+from src.app.routes.score import RouteType
 from src.app.schemas.score import LabelMessage
 
 logger = logging.getLogger(__name__)
@@ -35,10 +36,16 @@ def http_call_url(host_url: str, api_app_port: Optional[int] = None):
         return f"{host_url}:{api_app_port}"
 
 
-def request_data(images: List[str]):
+def get_request_data(
+    images: Optional[List[str]] = None,
+    images_labels: Optional[List[str]] = None,
+    images_urls: Optional[List[str]] = None,
+):
     return json.dumps(
         SentMessage(
             images=images,
+            images_labels=images_labels,
+            images_urls=images_urls,
             user_id="dummy_user_id",
             preferences=["environment", "societal", "animal", "health"],
         ).dict()
@@ -50,8 +57,9 @@ def build_full_route(route: str):
 
 
 def post_compute_score(
-    images: List[str],
-    route: str,
+    images: Optional[List[str]] = None,
+    images_urls: Optional[List[str]] = None,
+    images_labels: Optional[List[str]] = None,
     api_url: str = "http://localhost",
     api_port: int = 8080,
     authorization_token: Optional[str] = None,
@@ -65,12 +73,14 @@ def post_compute_score(
     }
     request_url = http_call_url(
         host_url=api_url, api_app_port=api_port
-    ) + build_full_route(route)
+    ) + build_full_route(RouteType.post_compute_score)
     response = requests.request(
         "POST",
         url=request_url,
         headers=headers,
-        data=request_data(images=images),
+        data=get_request_data(
+            images=images, images_labels=images_labels, images_urls=images_urls
+        ),
         timeout=timeout,
     )
     if response.status_code != 200:
