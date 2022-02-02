@@ -1,6 +1,8 @@
+import json
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 
 from src.app.crud.score import compute_score
 from src.app.schemas.score import LabelMessage, ScoreResponse
@@ -24,7 +26,7 @@ class RouteType:
     post_compute_score = "/post_compute_score"
 
 
-def handle_error(exception: Exception):
+def handle_error(exception: Exception, label: Optional[str] = None):
     if (
         isinstance(exception, MaterialNotFound)
         or isinstance(exception, CountryNotFound)
@@ -32,9 +34,14 @@ def handle_error(exception: Exception):
         or isinstance(exception, MissingMaterialPercentage)
         or isinstance(exception, MultipleLabelErrors)
     ):
-        raise HTTPException(detail=str(exception), status_code=422)
+        raise HTTPException(
+            detail={"error": str(exception), "label": label},
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
     else:
-        raise HTTPException(detail=str(exception), status_code=500)
+        raise HTTPException(
+            detail=str(exception), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @router.post(RouteType.post_compute_score, response_model=ScoreResponse)
@@ -47,13 +54,15 @@ def post_compute_score(
     # would this work to have the uuid that would allow me to retrieve
     # info about the user?
 ):
+    label = None
     try:
+        labels = []
         if score_message.images_labels is not None:
-            labels = score_message.images_labels
+            labels += score_message.images_labels
         elif score_message.images_urls is not None:
-            labels = [ocr(image_url=x) for x in score_message.images_urls]
+            labels += [ocr(image_url=x) for x in score_message.images_urls]
         elif score_message.images is not None:
-            labels = [ocr(image_bytes=x) for x in score_message.images]
+            labels += [ocr(image_bytes=x) for x in score_message.images]
         else:
             raise Exception(
                 f"At least one of "
@@ -75,4 +84,4 @@ def post_compute_score(
             label=label, score=clothing_score, materials=materials, country=country
         )
     except Exception as e:
-        handle_error(e)
+        handle_error(exception=e, label=label)
