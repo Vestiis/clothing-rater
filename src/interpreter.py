@@ -185,7 +185,7 @@ class Interpreter:
         return country
 
 
-@cachetools.func.ttl_cache(maxsize=None, ttl=float(os.environ["SECONDS_TO_LIVE_DB_REQUEST_CACHE"]))
+@cachetools.func.ttl_cache(maxsize=None, ttl=float(Config.Inputs.SECONDS_TO_LIVE_DB_REQUEST_CACHE))
 def _get_all_materials(api_url: str, serialize_as_python_obj: bool):
     # if materials available through memory store:
     # return memory store materials
@@ -194,7 +194,7 @@ def _get_all_materials(api_url: str, serialize_as_python_obj: bool):
     return materials
 
 
-@cachetools.func.ttl_cache(maxsize=None, ttl=float(os.environ["SECONDS_TO_LIVE_DB_REQUEST_CACHE"]))
+@cachetools.func.ttl_cache(maxsize=None, ttl=float(Config.Inputs.SECONDS_TO_LIVE_DB_REQUEST_CACHE))
 def _get_all_countries(api_url: str, serialize_as_python_obj: bool):
     return get_all_countries(api_url=api_url, serialize_as_python_obj=serialize_as_python_obj)
 
