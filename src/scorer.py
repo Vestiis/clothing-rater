@@ -57,27 +57,20 @@ class Scorer:
         self.health_ranking = health_ranking
         self.animal_ranking = animal_ranking
 
-    @property
-    def environment_importance(self):
-        return 1 / self.environment_ranking
-
-    @property
-    def societal_importance(self):
-        return 1 / self.societal_ranking
-
-    @property
-    def health_importance(self):
-        return 1 / self.health_ranking
-
-    @property
-    def animal_importance(self):
-        return 1 / self.animal_ranking
-
     def get_health_score(self, materials: List[LabelMaterial]):
         materials = [x for x in materials if x.percentage is not None]
         sum_weights = sum(x.percentage for x in materials)
+        value = sum(x.health * x.percentage for x in materials) / sum_weights
+        if self.health_ranking == 1 and value < 100:
+            value = (1 - 0.25) * value
+        elif self.health_ranking == 2 and value < 75:
+            value = (1 - 0.15) * value
+        elif self.health_ranking == 3:
+            pass
+        elif self.health_ranking == 4:
+            value = (1 + 0.05) * value
         return HealthScore(
-            value=sum(x.health * x.percentage for x in materials) / sum_weights,
+            value=value,
             treatment=sum(x.treatment * x.percentage for x in materials) / sum_weights,
             benef=sum(x.benef * x.percentage for x in materials) / sum_weights,
         )
@@ -85,15 +78,31 @@ class Scorer:
     def get_animal_score(self, materials: List[LabelMaterial]):
         materials = [x for x in materials if x.percentage is not None]
         sum_weights = sum(x.percentage for x in materials)
-        return AnimalScore(
-            value=sum(x.animal * x.percentage for x in materials) / sum_weights,
-        )
+        value = sum(x.animal * x.percentage for x in materials) / sum_weights
+        if self.health_ranking == 1 and value < 100:
+            value = (1 - 0.25) * value
+        elif self.health_ranking == 2 and value < 75:
+            value = (1 - 0.15) * value
+        elif self.health_ranking == 3:
+            pass
+        elif self.health_ranking == 4:
+            value = (1 + 0.05) * value
+        return AnimalScore(value=value,)
 
     def get_environment_score(self, materials: List[LabelMaterial]):
         materials = [x for x in materials if x.percentage is not None]
         sum_weights = sum(x.percentage for x in materials)
+        value = sum(x.env * x.percentage for x in materials) / sum_weights
+        if self.health_ranking == 1 and value < 100:
+            value = (1 - 0.25) * value
+        elif self.health_ranking == 2 and value < 75:
+            value = (1 - 0.15) * value
+        elif self.health_ranking == 3:
+            pass
+        elif self.health_ranking == 4:
+            value = (1 + 0.05) * value
         return EnvironmentScore(
-            value=sum(x.env * x.percentage for x in materials) / sum_weights,
+            value=value,
             nature=sum(x.nature * x.percentage for x in materials) / sum_weights,
             destruction=sum(x.destruction * x.percentage for x in materials)
             / sum_weights,
@@ -101,8 +110,17 @@ class Scorer:
         )
 
     def get_societal_score(self, country: LabelCountry):
+        value = country.societal
+        if self.health_ranking == 1 and value < 100:
+            value = (1 - 0.25) * value
+        elif self.health_ranking == 2 and value < 75:
+            value = (1 - 0.15) * value
+        elif self.health_ranking == 3:
+            pass
+        elif self.health_ranking == 4:
+            value = (1 + 0.05) * value
         return SocietalScore(
-            value=country.societal,
+            value=value,
             politique=country.politique,
             human_rights=country.human_rights,
             work=country.work,
@@ -119,17 +137,12 @@ class Scorer:
         environment_score = self.get_environment_score(materials=materials)
         return GlobalScore(
             value=(
-                animal_score.value * self.animal_importance
-                + health_score.value * self.health_importance
-                + societal_score.value * self.societal_importance
-                + environment_score.value * self.environment_importance
+                animal_score.value
+                + health_score.value
+                + societal_score.value
+                + environment_score.value
             )
-            / (
-                self.animal_importance
-                + self.health_importance
-                + self.societal_importance
-                + self.environment_importance
-            ),
+            / 4,
             societal_score=societal_score,
             health_score=health_score,
             environment_score=environment_score,
