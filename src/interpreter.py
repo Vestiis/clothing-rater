@@ -3,6 +3,7 @@ import os
 import re
 from typing import List, Optional
 
+import cachetools.func
 from database.api.meta.country import get_all_countries
 from database.api.meta.material import get_all_materials
 from database.api.schemas.country import Country
@@ -18,6 +19,7 @@ ADD_SPACE_ELEMENTS = [
     "made in",
     "/",
     "%",
+    "-",
 ]
 
 
@@ -60,17 +62,12 @@ class Interpreter:
 
         self._build()
 
-    @staticmethod
-    def _standardize_label(label: str):
+    def _standardize_label(self, label: str):
         label = label.replace(os.linesep, " ").lower()
-        for element in ADD_SPACE_ELEMENTS:
+        for element in ADD_SPACE_ELEMENTS:  # + self.material_names + self.country_names:
             label = label.replace(element, f" {element} ")
         # replace all trailing whitespaces by a single whitespace
         label = re.sub("[ ]{2,}", " ", label)
-        # if "made in" without space next to it then add a space next to it
-        # if matches := re.findall("(made in[^ ])", label):
-        #     for match in matches:
-        #         label = label.replace(match, f"{match[:-1]} {match[-1]}")
         return label
 
     @staticmethod
@@ -189,14 +186,28 @@ class Interpreter:
         return country
 
 
+@cachetools.func.ttl_cache(maxsize=None, ttl=float(os.environ["SECONDS_TO_LIVE_DB_REQUEST_CACHE"]))
+def _get_all_materials(api_url: str, serialize_as_python_obj: bool):
+    # if materials available through memory store:
+    # return memory store materials
+    materials = get_all_materials(api_url=api_url, serialize_as_python_obj=serialize_as_python_obj)
+    # set memory store materials
+    return materials
+
+
+@cachetools.func.ttl_cache(maxsize=None, ttl=float(os.environ["SECONDS_TO_LIVE_DB_REQUEST_CACHE"]))
+def _get_all_countries(api_url: str, serialize_as_python_obj: bool):
+    return get_all_countries(api_url=api_url, serialize_as_python_obj=serialize_as_python_obj)
+
+
 def get_interpreter(
     words_matcher: WordsMatcher = Depends(get_words_matcher),
 ) -> Interpreter:
     interpreter = Interpreter(
-        materials=get_all_materials(
+        materials=_get_all_materials(
             api_url=DATABASE_API_URL, serialize_as_python_obj=True
         ),
-        countries=get_all_countries(
+        countries=_get_all_countries(
             api_url=DATABASE_API_URL, serialize_as_python_obj=True
         ),
         words_matcher=words_matcher,

@@ -3,6 +3,7 @@ class Config:
         # advised nb pixels by Google:
         # https://cloud.google.com/vision/docs/supported-files
         pixels_per_image = 640 * 480
+        # pixels_per_image = 640 * 480 * 2
 
     class WordsMatcher:
         similarity_type = "difflib"

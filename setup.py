@@ -47,6 +47,7 @@ setup(
         "python-magic==0.4.24",
         "pyheif==0.6.1",
         "pytest==6.2.5",
+        "cachetools==3.1.0",
     ],
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"
