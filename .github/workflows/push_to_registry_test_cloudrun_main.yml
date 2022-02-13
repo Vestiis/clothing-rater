@@ -15,6 +15,8 @@ env:
   REGISTRY_LOCATION: eu.gcr.io
   REGISTRY_IMAGE_NAME: eu.gcr.io/impactful-ring-314819/clothing-rater
 
+  SECONDS_TO_LIVE_DB_REQUEST_CACHE: 60
+
 jobs:
   build-deploy:
     name: Build, tag, and push Docker image
