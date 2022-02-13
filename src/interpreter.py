@@ -10,7 +10,6 @@ from database.api.schemas.country import Country
 from database.api.schemas.material import Material
 from fastapi import Depends
 
-from src import DATABASE_API_URL
 from src.config import Config
 from src.words_matcher.match import MatchFilter
 from src.words_matcher.words_matcher import WordsMatcher, get_words_matcher
@@ -205,10 +204,10 @@ def get_interpreter(
 ) -> Interpreter:
     interpreter = Interpreter(
         materials=_get_all_materials(
-            api_url=DATABASE_API_URL, serialize_as_python_obj=True
+            api_url=Config.Inputs.DATABASE_API_URL, serialize_as_python_obj=True
         ),
         countries=_get_all_countries(
-            api_url=DATABASE_API_URL, serialize_as_python_obj=True
+            api_url=Config.Inputs.DATABASE_API_URL, serialize_as_python_obj=True
         ),
         words_matcher=words_matcher,
         filter_overlapping_materials_on=Config.Interpreter.filter_overlapping_materials_on

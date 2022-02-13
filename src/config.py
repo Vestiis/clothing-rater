@@ -1,3 +1,6 @@
+import os
+
+
 class Config:
     class Ocr:
         # advised nb pixels by Google:
@@ -13,3 +16,9 @@ class Config:
 
     class Interpreter:
         filter_overlapping_materials_on = "longest"
+
+    class Inputs:
+        DATABASE_API_URL = os.environ.get("DATABASE_API_URL")
+        SECONDS_TO_LIVE_DB_REQUEST_CACHE = os.environ.get(
+            "SECONDS_TO_LIVE_DB_REQUEST_CACHE"
+        )
