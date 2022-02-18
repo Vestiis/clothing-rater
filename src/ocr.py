@@ -19,12 +19,23 @@ logger = logging.getLogger(__name__)
 
 
 class Ocr:
-    def __init__(self, pixels_per_image: int = 640 * 480):
+    def __init__(
+        self, pixels_per_image: int = 640 * 480, google_image_format: str = "JPEG",
+    ):
         self.client_vision = vision.ImageAnnotatorClient()
         self.pixels_per_image = pixels_per_image
+        self.google_image_format = google_image_format
 
-    @staticmethod
-    def set_image_format_for_google_ocr(image_bytes: List[bytes]):
+    @property
+    def google_image_extension(self):
+        if self.google_image_format == "JPEG":
+            return "jpg"
+        elif self.google_image_format == "png":
+            return "png"
+        else:
+            raise ValueError("Image format must be one of JPEG, png")
+
+    def set_image_format_for_google_ocr(self, image_bytes: List[bytes]):
         # if file is of HEIC format then convert it to jpeg
         if "ISO Media" in magic.from_buffer(image_bytes):
             logger.warning(
@@ -40,8 +51,10 @@ class Ocr:
                 "raw",
                 heif_file.mode,
                 heif_file.stride,
-            ).save(f"{tmp_file}.jpg", "JPEG")
-            image_bytes = open(f"{tmp_file}.jpg", "rb").read()
+            ).save(
+                f"{tmp_file}.{self.google_image_extension}", self.google_image_format
+            )
+            image_bytes = open(f"{tmp_file}.{self.google_image_extension}", "rb").read()
         return image_bytes
 
     def set_quality(self, image_bytes: List[bytes]):
@@ -51,7 +64,7 @@ class Ocr:
         new_height = int(new_width * height_over_width)
         image = image.resize((new_width, new_height), Image.ANTIALIAS)
         image_bytes = io.BytesIO()
-        image.save(image_bytes, format="png")
+        image.save(image_bytes, format=self.google_image_format)
         return image_bytes.getvalue()
 
     def preprocess(self, image_bytes: List[bytes]):
@@ -79,4 +92,7 @@ class Ocr:
 
 
 def get_ocr():
-    return Ocr(pixels_per_image=Config.Ocr.pixels_per_image)
+    return Ocr(
+        pixels_per_image=Config.Ocr.pixels_per_image,
+        google_image_format=Config.Ocr.google_image_format,
+    )

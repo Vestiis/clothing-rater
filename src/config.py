@@ -7,6 +7,9 @@ class Config:
         # https://cloud.google.com/vision/docs/supported-files
         pixels_per_image = 640 * 480
         # pixels_per_image = 640 * 480 * 2
+        # jpeg is lighter than other image format so it is more
+        # convenient to sent to Google Vision
+        google_image_format = "JPEG"
 
     class WordsMatcher:
         similarity_type = "difflib"
