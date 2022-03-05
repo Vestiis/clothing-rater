@@ -3,12 +3,16 @@ from typing import List, Optional, Union
 
 
 class MaterialNotFound(Exception):
+    def __init__(self, label: str):
+        self.label = label
+
     def __str__(self):
         return "No material found"
 
 
 class MissingMaterialPercentage(Exception):
-    def __init__(self, material: str):
+    def __init__(self, material: str, label: str):
+        self.label = label
         self.material = material
 
     def __str__(self):
@@ -16,6 +20,9 @@ class MissingMaterialPercentage(Exception):
 
 
 class CountryNotFound(Exception):
+    def __init__(self, label: str):
+        self.label = label
+
     def __str__(self):
         return "No country found"
 
@@ -28,10 +35,12 @@ class TextNotFound(Exception):
 class MultipleLabelErrors(Exception):
     def __init__(
         self,
+        label: str,
         material_not_found_exc: Optional[MaterialNotFound] = None,
         missing_percentage_excs: Optional[List[MissingMaterialPercentage]] = None,
         country_not_found_exc: Optional[CountryNotFound] = None,
     ):
+        self.label = label
         self.material_not_found_exc = material_not_found_exc
         self.missing_percentage_excs = missing_percentage_excs
         self.country_not_found_exc = country_not_found_exc

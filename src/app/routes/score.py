@@ -89,7 +89,10 @@ def post_compute_score(
         MultipleLabelErrors,
     ) as exception:
         raise HTTPException(
-            detail={"error": str(exception), "label": label},
+            detail={
+                "error": str(exception),
+                "label": getattr(exception, "label", None),
+            },
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
     return ScoreResponse(
