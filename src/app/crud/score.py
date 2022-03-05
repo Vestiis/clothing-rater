@@ -7,6 +7,7 @@ from src.exceptions import (
     MultipleLabelErrors,
 )
 from src.interpreter import Interpreter, LabelCountry, LabelMaterial
+from src.ocr import Ocr, OcrBoundingPoly
 from src.scorer import GlobalScore, Scorer
 
 
@@ -27,7 +28,7 @@ def get_country_exception(found_country: Optional[LabelCountry]):
         return CountryNotFound()
 
 
-def handle_interpreter_exceptions(
+def raise_compute_score_exceptions_from_interpreter(
     found_materials: List[LabelMaterial], found_country: Optional[LabelCountry]
 ):
     exceptions = []
@@ -57,20 +58,74 @@ def handle_interpreter_exceptions(
         )
 
 
-def compute_score(
-    label: str,
+def get_images_labels_and_bounding_polys(ocr, images_bytes, images_bounding_polys):
+    if images_bounding_polys is None:
+        return
+
+
+def ocr_and_compute_images_score(
+    ocr: Ocr,
     interpreter: Interpreter,
     environment_ranking: float,
     societal_ranking: float,
     animal_ranking: float,
     health_ranking: float,
+    pre_known_labels: Optional[List[str]] = None,
+    images_bytes: Optional[List[List[bytes]]] = None,
+    google_images_bounding_polys: Optional[List[List[OcrBoundingPoly]]] = None,
     return_found_elements: bool = False,
+    retry_with_google_bounding_polys: bool = False,
 ) -> Union[GlobalScore, Tuple[GlobalScore, List[LabelMaterial], List[LabelCountry]]]:
+    if google_images_bounding_polys is None:
+        images_labels_and_google_bounding_polys = [
+            ocr(image_bytes=image_bytes) for image_bytes in images_bytes
+        ]
+    else:
+        images_labels_and_google_bounding_polys = [
+            ocr(image_bytes=image_bytes, image_bounding_polys=google_bounding_polys)
+            for image_bytes, google_bounding_polys in zip(
+                images_bytes, google_images_bounding_polys
+            )
+        ]
+    label = ""
+    if pre_known_labels is not None:
+        label += " ".join(pre_known_labels)
+    label = f"{label} {' '.join(label for label, _ in images_labels_and_google_bounding_polys)}"
     found_materials = interpreter.find_materials(label=label)
     found_country = interpreter.find_country(label=label)
-    handle_interpreter_exceptions(
-        found_materials=found_materials, found_country=found_country
-    )
+    try:
+        raise_compute_score_exceptions_from_interpreter(
+            found_materials=found_materials, found_country=found_country
+        )
+    except (
+        CountryNotFound,
+        MaterialNotFound,
+        MissingMaterialPercentage,
+        MultipleLabelErrors,
+    ) as e:
+        # if has not been retried before and retry is wanted then retry
+        # else raise exception
+        if retry_with_google_bounding_polys:
+            return ocr_and_compute_images_score(
+                ocr=ocr,
+                interpreter=interpreter,
+                environment_ranking=environment_ranking,
+                societal_ranking=societal_ranking,
+                animal_ranking=animal_ranking,
+                health_ranking=health_ranking,
+                pre_known_labels=pre_known_labels,
+                images_bytes=images_bytes,
+                google_images_bounding_polys=[
+                    bounding_poly
+                    for _, bounding_poly in images_labels_and_google_bounding_polys
+                ],
+                return_found_elements=return_found_elements,
+                # very dangerous, force only retry once so not to end up in infinite loop
+                # of costly google vision calls
+                retry_with_google_bounding_polys=False,
+            )
+        else:
+            raise e
     score = Scorer(
         environment_ranking=environment_ranking,
         societal_ranking=societal_ranking,
@@ -78,5 +133,5 @@ def compute_score(
         health_ranking=health_ranking,
     )(country=found_country, materials=found_materials)
     if return_found_elements:
-        return score, found_materials, found_country
+        return score, found_materials, found_country, label
     return score
