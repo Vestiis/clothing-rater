@@ -15,6 +15,7 @@ from src.words_matcher.match import MatchFilter
 from src.words_matcher.words_matcher import WordsMatcher, get_words_matcher
 
 ADD_SPACE_ELEMENTS = [
+    "madein",
     "made in",
     "/",
     "%",

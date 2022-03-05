@@ -8,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.app.helper.google_interface import GoogleInterface
 from src.app.routes import score
+from src.app.schemas.score import LabelMessageNoImageSourceError
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -28,7 +29,7 @@ def check_security(credentials: HTTPAuthorizationCredentials = Security(security
 
 
 def get_application() -> FastAPI:
-    app = FastAPI()
+    app = FastAPI(debug=True)
 
     api_router = APIRouter()
     api_router.include_router(
@@ -44,6 +45,12 @@ def get_application() -> FastAPI:
 
 
 app = get_application()
+
+
+@app.exception_handler(LabelMessageNoImageSourceError)
+async def label_message_no_image_source_exception_handler(request, exc):
+    logger.error(f"Pydantic error: {str(exc)}")
+    return PlainTextResponse(str(exc), status_code=400)
 
 
 @app.exception_handler(RequestValidationError)
