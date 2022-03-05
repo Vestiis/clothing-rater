@@ -11,11 +11,11 @@ from src.ocr import Ocr, OcrBoundingPoly
 from src.scorer import GlobalScore, Scorer
 
 
-def get_material_exceptions(found_materials: List[LabelMaterial]):
+def get_material_exceptions(label: str, found_materials: List[LabelMaterial]):
     if not found_materials:
-        return [MaterialNotFound()]
+        return [MaterialNotFound(label=label)]
     return [
-        MissingMaterialPercentage(material=material.names[0])
+        MissingMaterialPercentage(label=label, material=material.names[0])
         for material in found_materials
         if material.percentage is None
     ]
@@ -23,19 +23,23 @@ def get_material_exceptions(found_materials: List[LabelMaterial]):
     # raise MissingMaterials("Missing materials, less than 100% composition")
 
 
-def get_country_exception(found_country: Optional[LabelCountry]):
+def get_country_exception(label: str, found_country: Optional[LabelCountry]):
     if found_country is None:
-        return CountryNotFound()
+        return CountryNotFound(label=label)
 
 
 def raise_compute_score_exceptions_from_interpreter(
-    found_materials: List[LabelMaterial], found_country: Optional[LabelCountry]
+    label: str,
+    found_materials: List[LabelMaterial],
+    found_country: Optional[LabelCountry],
 ):
     exceptions = []
-    material_excs = get_material_exceptions(found_materials=found_materials)
+    material_excs = get_material_exceptions(
+        label=label, found_materials=found_materials
+    )
     if material_excs:
         exceptions += material_excs
-    country_exc = get_country_exception(found_country=found_country)
+    country_exc = get_country_exception(label=label, found_country=found_country)
     if country_exc:
         exceptions.append(country_exc)
     if not exceptions:
@@ -44,6 +48,7 @@ def raise_compute_score_exceptions_from_interpreter(
         raise exceptions[0]
     else:
         raise MultipleLabelErrors(
+            label=label,
             material_not_found_exc=[
                 exc for exc in exceptions if isinstance(exc, MaterialNotFound)
             ][0]
@@ -56,11 +61,6 @@ def raise_compute_score_exceptions_from_interpreter(
             else None,
             country_not_found_exc=country_exc if country_exc is not None else None,
         )
-
-
-def get_images_labels_and_bounding_polys(ocr, images_bytes, images_bounding_polys):
-    if images_bounding_polys is None:
-        return
 
 
 def ocr_and_compute_images_score(
@@ -95,7 +95,7 @@ def ocr_and_compute_images_score(
     found_country = interpreter.find_country(label=label)
     try:
         raise_compute_score_exceptions_from_interpreter(
-            found_materials=found_materials, found_country=found_country
+            label=label, found_materials=found_materials, found_country=found_country
         )
     except (
         CountryNotFound,
