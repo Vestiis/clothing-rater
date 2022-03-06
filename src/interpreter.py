@@ -105,8 +105,10 @@ class Interpreter:
     ):
         if look_left_first is None:
             look_left_first = True
+        # a whitespace next to the first digit is enforced, if not the '.*' part would
+        # also match the first digits of the percentage
         expressions = [
-            "{}[^0-9]*(\d+) ?%[^0-9]*{}"  # if material and its translations are next to percentage
+            "{}.* (\d+) ?%.*{}"  # if material and its translations are next to percentage
         ]
         if look_left_first:
             args = ["", label_material]
