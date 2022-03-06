@@ -1,11 +1,7 @@
 from typing import List, Optional, Tuple, Union
 
-from src.exceptions import (
-    CountryNotFound,
-    MaterialNotFound,
-    MissingMaterialPercentage,
-    MultipleLabelErrors,
-)
+from src.exceptions import (CountryNotFound, MaterialNotFound,
+                            MissingMaterialPercentage, MultipleLabelErrors)
 from src.interpreter import Interpreter, LabelCountry, LabelMaterial
 from src.ocr import Ocr, OcrBoundingPoly
 from src.scorer import GlobalScore, Scorer
@@ -34,30 +30,30 @@ def raise_compute_score_exceptions_from_interpreter(
     found_country: Optional[LabelCountry],
 ):
     exceptions = []
-    material_excs = get_material_exceptions(
-        label=label, found_materials=found_materials
-    )
-    if material_excs:
+    if material_excs := get_material_exceptions(
+            label=label, found_materials=found_materials
+    ):
         exceptions += material_excs
-    country_exc = get_country_exception(label=label, found_country=found_country)
-    if country_exc:
+    if country_exc := get_country_exception(label=label, found_country=found_country):
         exceptions.append(country_exc)
     if not exceptions:
         pass
     elif len(exceptions) == 1:
         raise exceptions[0]
     else:
+        material_not_found_excs = [
+            exc for exc in exceptions if isinstance(exc, MaterialNotFound)
+        ]
+        missing_percentage_excs = [
+            exc for exc in exceptions if isinstance(exc, MissingMaterialPercentage)
+        ]
         raise MultipleLabelErrors(
             label=label,
-            material_not_found_exc=[
-                exc for exc in exceptions if isinstance(exc, MaterialNotFound)
-            ][0]
-            if any(isinstance(exc, MaterialNotFound) for exc in exceptions)
+            material_not_found_exc=material_not_found_excs[0]
+            if material_not_found_excs
             else None,
-            missing_percentage_excs=[
-                exc for exc in exceptions if isinstance(exc, MissingMaterialPercentage)
-            ]
-            if any(isinstance(exc, MissingMaterialPercentage) for exc in exceptions)
+            missing_percentage_excs=missing_percentage_excs
+            if missing_percentage_excs
             else None,
             country_not_found_exc=country_exc if country_exc is not None else None,
         )
