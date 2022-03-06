@@ -22,6 +22,11 @@ ADD_SPACE_ELEMENTS = [
     "-",
 ]
 
+CANCEL_ELEMENTS = [
+    "(",
+    ")",
+]
+
 
 class LabelMaterial(Material):
     percentage: Optional[float]
@@ -64,7 +69,9 @@ class Interpreter:
 
     def _standardize_label(self, label: str):
         label = label.replace(os.linesep, " ").lower()
-        for element in ADD_SPACE_ELEMENTS:  # + self.material_names + self.country_names:
+        for element in CANCEL_ELEMENTS:
+            label = label.replace(element, "")
+        for element in ADD_SPACE_ELEMENTS:
             label = label.replace(element, f" {element} ")
         # replace all trailing whitespaces by a single whitespace
         label = re.sub("[ ]{2,}", " ", label)
