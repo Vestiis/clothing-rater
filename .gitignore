@@ -15,3 +15,5 @@ env_variables
 **/__pycache__
 sample_labels
 debug
+build
+dist

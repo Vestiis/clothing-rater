@@ -10,7 +10,7 @@ from multiprocessing.dummy import Pool
 
 import requests
 
-from src.app.routes.score import RouteType
+from src.app.routes.score import Route
 from src.meta.request import post_compute_score
 
 
@@ -51,7 +51,7 @@ if __name__ == "__main__":
             async_results.append(
                 pool.apply_async(
                     post_compute_score,
-                    (request_images, RouteType.post_compute_score_from_image_bytes,),
+                    (request_images, Route.post_compute_score_from_image_bytes,),
                     {"api_url": API_URL, "api_port": API_PORT},
                 )
             )

@@ -68,6 +68,9 @@ class Interpreter:
         self._build()
 
     def _standardize_label(self, label: str):
+        # add a space in case label starts with percentage to be compliant
+        # with regex that assumes a space before percentage digits
+        label = f" {label}"
         label = label.replace(os.linesep, " ").lower()
         for element in CANCEL_ELEMENTS:
             label = label.replace(element, "")
@@ -146,8 +149,10 @@ class Interpreter:
         matches = sorted(matches, key=lambda match: match.start)
         look_left_first = None
         for match in matches:
+            # standardize one more time in case words_matcher standardization
+            # has introduced something wrong
             percentage, found_on_left = self._find_material_percentage(
-                label=match.sentence,
+                label=self._standardize_label(match.sentence),
                 label_material=match.matching_sub_sentence,
                 look_left_first=look_left_first,
             )

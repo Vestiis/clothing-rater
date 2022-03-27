@@ -2,6 +2,7 @@ import collections
 import io
 import logging
 import math
+from enum import Enum
 from functools import cached_property, lru_cache
 from typing import List, Optional
 
@@ -64,11 +65,16 @@ class OcrBoundingPoly(BaseModel):
             return GlobalOrientation.left
 
 
+class GoogleImageFormat(str, Enum):
+    JPEG = "JPEG"
+    png = "png"
+
+
 class Ocr:
     def __init__(
         self,
         pixels_per_image: int = 640 * 480,
-        google_image_format: str = "JPEG",
+        google_image_format: str = GoogleImageFormat.JPEG,
         # assume_image
     ):
         self.client_vision = vision.ImageAnnotatorClient()
@@ -87,6 +93,10 @@ class Ocr:
     def set_image_format_for_google_ocr(self, image: Image):
         if image.format is None or image.format != self.google_image_format:
             image_bytes = io.BytesIO()
+            if self.google_image_format == GoogleImageFormat.JPEG:
+                # JPEG does not support transparency so convert RGBA to RGB
+                # https://stackoverflow.com/questions/48248405/cannot-write-mode-rgba-as-jpeg
+                image = image.convert("RGB")
             image.save(image_bytes, format=self.google_image_format)
             image = self.get_image_from_bytes(image_bytes=image_bytes.getvalue())
         return image

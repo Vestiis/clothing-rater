@@ -7,7 +7,7 @@ import requests
 from pydantic import validator
 
 from src.app.helper.google_interface import GoogleInterface
-from src.app.routes.score import RouteType
+from src.app.routes.score import Route
 from src.app.schemas.score import LabelMessage
 
 logger = logging.getLogger(__name__)
@@ -52,8 +52,12 @@ def get_request_data(
     )
 
 
-def build_full_route(route: str):
-    return f"/v1/score{route}"
+def build_full_route(router_prefix: str, route: str, api_app_prefix: str = "/v1"):
+    return f"{api_app_prefix}{router_prefix}{route}"
+
+
+# def build_full_route(route: str):
+#     return f"/v1/score{route}"
 
 
 def post_compute_score(
@@ -73,7 +77,7 @@ def post_compute_score(
     }
     request_url = http_call_url(
         host_url=api_url, api_app_port=api_port
-    ) + build_full_route(RouteType.post_compute_score)
+    ) + build_full_route(Route.post_compute_score)
     response = requests.request(
         "POST",
         url=request_url,

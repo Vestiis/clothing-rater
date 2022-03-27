@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
+APP_PREFIX = "/v1"
+
 
 def check_security(credentials: HTTPAuthorizationCredentials = Security(security)):
     authorization = credentials.credentials
@@ -31,44 +33,29 @@ def check_security(credentials: HTTPAuthorizationCredentials = Security(security
 def get_application() -> FastAPI:
     app = FastAPI(debug=True)
 
-    api_router = APIRouter()
-    api_router.include_router(
-        score.router,
-        prefix="/score",
-        tags=["score"],
-        # dependencies=[Depends(check_security)],
-    )
-    app.include_router(
-        api_router, prefix="/v1"  # , dependencies=[Depends(check_security)
+    api_router = APIRouter(prefix=APP_PREFIX)
+    api_router.include_router(score.router,)  # dependencies=[Depends(check_security)],
+    app.include_router(api_router)  # , dependencies=[Depends(check_security)
+
+    @app.exception_handler(LabelMessageNoImageSourceError)
+    async def label_message_no_image_source_exception_handler(request, exc):
+        logger.error(f"Pydantic error: {str(exc)}")
+        return PlainTextResponse(str(exc), status_code=400)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request, exc):
+        logger.error(f"Wrong body: {exc.body} pydantic error: {str(exc)}")
+        return PlainTextResponse(str(exc), status_code=400)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost", "http://localhost:8081"],
+        allow_origin_regex="https?://.*",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     return app
 
 
 app = get_application()
-
-
-@app.exception_handler(LabelMessageNoImageSourceError)
-async def label_message_no_image_source_exception_handler(request, exc):
-    logger.error(f"Pydantic error: {str(exc)}")
-    return PlainTextResponse(str(exc), status_code=400)
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
-    logger.error(f"Wrong body: {exc.body} pydantic error: {str(exc)}")
-    return PlainTextResponse(str(exc), status_code=400)
-
-
-origins = [
-    "http://localhost",
-    "http://localhost:8081",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex="https?://.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
