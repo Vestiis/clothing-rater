@@ -1,3 +1,5 @@
+from enum import Enum
+from random import shuffle
 from typing import List
 
 from pydantic import BaseModel
@@ -5,11 +7,18 @@ from pydantic import BaseModel
 from src.interpreter import LabelCountry, LabelMaterial
 
 
-class Criteria:
+class Preference(str, Enum):
     environment = "environment"
     societal = "societal"
     animal = "animal"
     health = "health"
+
+    @classmethod
+    def to_list(cls, random_order: bool = False):
+        the_list = [data.name for data in cls]
+        if random_order:
+            shuffle(the_list)
+        return the_list
 
 
 class AnimalScore(BaseModel):
@@ -79,27 +88,27 @@ class Scorer:
         materials = [x for x in materials if x.percentage is not None]
         sum_weights = sum(x.percentage for x in materials)
         value = sum(x.animal * x.percentage for x in materials) / sum_weights
-        if self.health_ranking == 1 and value < 100:
+        if self.animal_ranking == 1 and value < 100:
             value = (1 - 0.25) * value
-        elif self.health_ranking == 2 and value < 75:
+        elif self.animal_ranking == 2 and value < 75:
             value = (1 - 0.15) * value
-        elif self.health_ranking == 3:
+        elif self.animal_ranking == 3:
             pass
-        elif self.health_ranking == 4:
+        elif self.animal_ranking == 4:
             value = (1 + 0.05) * value
-        return AnimalScore(value=value,)
+        return AnimalScore(value=value)
 
     def get_environment_score(self, materials: List[LabelMaterial]):
         materials = [x for x in materials if x.percentage is not None]
         sum_weights = sum(x.percentage for x in materials)
         value = sum(x.env * x.percentage for x in materials) / sum_weights
-        if self.health_ranking == 1 and value < 100:
+        if self.environment_ranking == 1 and value < 100:
             value = (1 - 0.25) * value
-        elif self.health_ranking == 2 and value < 75:
+        elif self.environment_ranking == 2 and value < 75:
             value = (1 - 0.15) * value
-        elif self.health_ranking == 3:
+        elif self.environment_ranking == 3:
             pass
-        elif self.health_ranking == 4:
+        elif self.environment_ranking == 4:
             value = (1 + 0.05) * value
         return EnvironmentScore(
             value=value,
@@ -111,13 +120,13 @@ class Scorer:
 
     def get_societal_score(self, country: LabelCountry):
         value = country.societal
-        if self.health_ranking == 1 and value < 100:
+        if self.societal_ranking == 1 and value < 100:
             value = (1 - 0.25) * value
-        elif self.health_ranking == 2 and value < 75:
+        elif self.societal_ranking == 2 and value < 75:
             value = (1 - 0.15) * value
-        elif self.health_ranking == 3:
+        elif self.societal_ranking == 3:
             pass
-        elif self.health_ranking == 4:
+        elif self.societal_ranking == 4:
             value = (1 + 0.05) * value
         return SocietalScore(
             value=value,

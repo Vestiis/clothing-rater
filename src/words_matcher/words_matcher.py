@@ -21,15 +21,18 @@ def filter_same_location_matches(
 ):
     overlaps = []
     for match in matches:
+        match_is_overlapping = False
         for overlap in overlaps:
             if overlap.match_overlaps(match):
+                match_is_overlapping = True
                 overlap.add(match)
-                continue
-        overlaps.append(
-            OverlappingMatches(
-                left_bound=match.start, right_bound=match.end, matches=[match]
+                break
+        if not match_is_overlapping:
+            overlaps.append(
+                OverlappingMatches(
+                    left_bound=match.start, right_bound=match.end, matches=[match]
+                )
             )
-        )
     if filter_on == MatchFilter.longest:
         return [
             sorted(

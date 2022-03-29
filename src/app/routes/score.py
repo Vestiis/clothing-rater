@@ -15,39 +15,22 @@ from src.exceptions import (
     MultipleLabelErrors,
     TextNotFound,
 )
+from src.http_exception import HttpLabelException
 from src.interpreter import Interpreter, get_interpreter
 from src.ocr import Ocr, get_ocr
-from src.scorer import Criteria
+from src.scorer import Preference
 
-router = APIRouter()
+router = APIRouter(prefix="/score", tags=["score"])
 logger = logging.getLogger(__name__)
 # prevent compute score function from being called more than twice
 sys.setrecursionlimit(100)
 
 
-class RouteType:
+class Route:
     post_compute_score = "/post_compute_score"
 
 
-def raise_error(exception: Exception, label: Optional[str] = None):
-    if (
-        isinstance(exception, MaterialNotFound)
-        or isinstance(exception, CountryNotFound)
-        or isinstance(exception, TextNotFound)
-        or isinstance(exception, MissingMaterialPercentage)
-        or isinstance(exception, MultipleLabelErrors)
-    ):
-        raise HTTPException(
-            detail={"error": str(exception), "label": label},
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        )
-    else:
-        raise HTTPException(
-            detail=str(exception), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@router.post(RouteType.post_compute_score, response_model=ScoreResponse)
+@router.post(Route.post_compute_score, response_model=ScoreResponse)
 def post_compute_score(
     *,
     score_message: LabelMessage = Body(..., embed=False),
@@ -71,11 +54,11 @@ def post_compute_score(
         clothing_score, materials, country, label = ocr_and_compute_images_score(
             interpreter=interpreter,
             ocr=ocr,
-            environment_ranking=score_message.preferences.index(Criteria.environment)
+            environment_ranking=score_message.preferences.index(Preference.environment)
             + 1,
-            societal_ranking=score_message.preferences.index(Criteria.societal) + 1,
-            animal_ranking=score_message.preferences.index(Criteria.animal) + 1,
-            health_ranking=score_message.preferences.index(Criteria.health) + 1,
+            societal_ranking=score_message.preferences.index(Preference.societal) + 1,
+            animal_ranking=score_message.preferences.index(Preference.animal) + 1,
+            health_ranking=score_message.preferences.index(Preference.health) + 1,
             pre_known_labels=score_message.images_labels,
             images_bytes=images_bytes,
             retry_with_google_bounding_polys=Config.ComputeScore.retry_with_google_bounding_polys,
@@ -88,13 +71,7 @@ def post_compute_score(
         MissingMaterialPercentage,
         MultipleLabelErrors,
     ) as exception:
-        raise HTTPException(
-            detail={
-                "error": str(exception),
-                "label": getattr(exception, "label", None),
-            },
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        )
+        raise HttpLabelException(exception=exception)
     return ScoreResponse(
         label=label, score=clothing_score, materials=materials, country=country
     )

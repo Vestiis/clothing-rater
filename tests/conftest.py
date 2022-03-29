@@ -1,8 +1,47 @@
-from typing import List
+from typing import Any, Generator
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
-from src.interpreter import Interpreter
+from src.app.api import get_application
+from src.interpreter import Interpreter, get_interpreter
+from src.words_matcher.words_matcher import get_words_matcher
+
+
+@pytest.fixture()
+def interpreter() -> Interpreter:
+    """
+    Create a new FastAPI TestClient that uses the `db_session` fixture to override
+    the `get_db` dependency that is injected into routes.
+    """
+    yield get_interpreter(words_matcher=get_words_matcher())
+
+
+@pytest.fixture()
+def app() -> Generator[FastAPI, Any, None]:
+    """
+    Create a fresh app on each test case.
+    """
+    _app = get_application()
+
+    def _check_security():
+        return None
+
+    # _app.dependency_overrides[check_security] = _check_security
+
+    yield _app
+
+
+@pytest.fixture()
+def client(app: FastAPI) -> Generator[TestClient, Any, None]:
+    """
+    Create a new FastAPI TestClient that uses the `db_session` fixture to override
+    the `get_db` dependency that is injected into routes.
+    """
+    with TestClient(app=app) as client:
+        yield client
+
 
 COUNTRIES, MATERIALS_NAMES, LABELS = [
     list(x)
@@ -106,36 +145,44 @@ COUNTRIES, MATERIALS_NAMES, LABELS = [
                 ["coton"],
                 "UREN\nIALPH LAUREN\nMADE IN\nJORDAN\nFABRIQUÉ EN\nJORDANIE\n100%\nCOTTON/\nCOTON\nEXCLUSIVE OF\nDECORATION/\nEXCLUSIF\nDE LA\nDÉCORATION\n",
             ),
+            # https://storage.googleapis.com/public-labels/20220306_141430.jpg
+            # https://storage.googleapis.com/public-labels/20220306_141447.jpg
+            (
+                "china",
+                ["COTTON", "POLYESTER", "recycled cotton"],
+                " adidas\nHoogoorddreef 9a\nAmsterdam 1101 BA\nThe Netherlands\nMADE IN CHINA\nFABRIQUÉ EN CHINE\nFABRICADO EN CHINA\nFABRICADO NA CHINA\nGYÁRTVA: KÍNA\nПРОИЗВЕДЕНО В КИТАЙ\nСДЕЛАНО В КИТАЕ\nPROIZVEDENO U KINI\nÇİN'DE İMAL EDİLMİŞTİR.\nҚЫТАЙДА ЖАСАЛҒАН\nPROIZVĖDENO U KINI\nFABRICAT ÎN CHINA\nall: Laill al\nRN# 88387 CA# 40312\nX回aQ\n40\nUS/\nUK: MACHINE WASH WARM/ DO NOT\nBLEACH/ DO NOT TUMBLE DRY/ COOL\nIRON IF NEEDED/DO NOT DRY CLEAN\nDO NOT USE FABRIC SOFTENER/USE\nMILD DETERGENT ONLY/WASH WITH\nLIKE COLORS/DO NOT IRON MOTIF\nD: KEINEN WEICHSPUELER VERWENDEN/\nBITTE FEINWASCHMITTEL VERWENDEN/\nMIT GLEICHEN FARBEN WASCHEN/\nMOTIV BITTE NICHT BUEGELN\nF:\nNE PAS UTILISER D'ASSOUPLISSEUR/\nUTILISER UN DÉTERGENT DOUX/LAVER\n HOOD LINING: 58% COTTON/\n27% POLYESTER (RECYCLED/\n15% COTTON (RECYCLED)\nUK: MAIN MATERIAL: 58% COTTON/\n27% POLYESTER (RECYCLED)y/\n15% COTTON (RECYCLED)/\nHOOD LINING: 58% COTTON/\n27% POLYESTER (RECYCLED)/\n15% COTTON (RECYCLED)\nD: HAUPTMATERIAL:\n58% BAUMWOLLE/27% POLYESTER\n(RECYCLED/15% BAUMWOLLE\n(RECYCLED/KAPUZENFUTTER:\n58% BAUMWOLLE/27% POLYESTER\n(RECYCLED)/15% BAUMWOLLE\n(RECYCLED)\nF: MATIERE PRINCIPALE: 58% COTON/\n27% POLYESTER (RECYCLÉ/\n15% COTON (RECYCLÉJ\nDOUBLURE CAPUCHE: 58% COTON/\n27% POLYESTER (RECYCLÉ/\n15% COTON (RECYCLÉ)\nE: MATERIAL PRINCIPAL:\n58% ALGODÓN/27% POLIESTER\n(RECICLADO15% ALGODÓN\n(RECICLADO)/FORRO CAPUCHA:\n58% ALGODÓN/27% POLIESTER\n(RECICLADO/15% ALGODÓN\n(RECICLADO)\nP: MATERIAL PRINCIPAL:\n58% ALGODĀO/27% POLIÉSTER\n(RECYCLED)15% ALGODÃO\n(RECYCLEDVFORRO DO CAPUZ:\n58% ALGODÃO/27% POLIÉSTER\n(RECYCLEDY15% ALGODÃO\n(RECYCLED)\n",
+            ),
+            # https://storage.googleapis.com/public-labels/IMG_5459.JPEG
+            # https://storage.googleapis.com/public-labels/IMG_5460.JPEG
+            (
+                "poland",
+                ["cotton"],
+                " PONFRY\nHE OTEMBAT\nLEMDEPATYPE\nMAKCHMYM 110C\nXHM-4RCTKA BCEM\nPACTROPHTERAM\n30^C水洗\n不可潮白\n不可转篮干燥\nLAVER ETREPASSER SUR\nL'ENVERS WASH AND\nIRON INSIDE OUT\nSECHAGE SUR CINTRE\nDRY ON HANGER\nRN 139569\nMADE IN\nPOLAND\nTHE KOOPLED PRODUCION\n11 RUE DE PRONY\n017PARIS FRANCE\n WHI01\nC018445\nTHE KOOPLES\nPARIS\nEXTERIEUR-\nOUTSHELL- EXTERIOR-\nBHEWHAA HACTE\n100%COTON COTTON-\nALGODÓN-\nO巴 又网\nLAVAGE A 30°C\nBLANCHIMENT INTERDIT\nSECHAGE EN TAMBOUR\nINTERDIT\nREPASSAGE 110°C MAX\nNETTOYAGE A SEC TOUS\nSOLVANTS NORMAUX\nWASH AT 30'C\nDO NOT BLEACH\n0O NOT TUMBLE DRY\nON LOW HEAT\n(5.0\n",
+            ),
+            # https://storage.googleapis.com/public-labels/IMG_5453.JPEG
+            (
+                "china",
+                ["laine", "NYLON"],
+                " Gap\nMADE WITH LAMBSWOOL\nCONTIENT DE LA LAINE D'AGNEAU\nREALIZZATO IN LANA DI AGNELLO\nS/P\nMADE IN\nCHINA\n52%\nLAMBS'WOOLA\nLAINE\nD'AGNEAU/\nIG VNYT\nAGNELLO\n484 NYLON\n",
+            ),
+            # https://storage.googleapis.com/public-labels/IMG_5447.JPEG
+            (
+                "china",
+                ["cotton"],
+                " MADE IN CHINA\nFABRIQUE EN CHINE\nHECHO EN CHINA\nCINDE URETILMISTIR\n100% COTTON/COTON/ALGODON!\nALGODÃO/BAUMWOLLE/COTONE\nPAMUK\nEXCLUSIVE OF DECORATIONELASTIC\nSAUF DÉCORATION/ELASTIQUE\nELASTIK HARICTIR\nUS\n回瓜百品\n40C\nEU\n回人区 O\nWASH DARK COLORS SEPARATELY\nREMOVE PROMPTLY, RESHAPE\nTO SIZE, DRY FLAT IN SHADE\nVERSO/AL REVERSO\n",
+            ),
+            # https://storage.googleapis.com/public-labels/IMG_5484.JPEG
+            (
+                "china",
+                ["nylon"],
+                " SHELL 00 NLON\nYADD ING\n8 DOWN\n10% FEATHER\nNE 00 NYL ON\nLININ\n*A BATHING APE\nNOWHERE CO. LTD.\n03 (5772) 2524\nWWWRAP COM\nMADE IN CHINA\n",
+            ),
+            # https://storage.googleapis.com/public-labels/IMG_5485.JPEG
+            (
+                "china",
+                ["polyester"],
+                " 19504104-01)\n-005A-06B\nMADE IN CHINA\nFABRIQUE EN CHINE\nHERGESTELLT IN CHINA\nFABRICADO EN CHINA\nGEMAAKT IN CHINA\nYERKAD I KINA\nESTILLET I KINA.\nRICATO IN CN\nPOLYESTER\nPOLYESTER\n100\nPOLYESTER\n100%\nPOLIESTER\n100%\nPOLYESTER\n100%\nPOLYESTER\n100%\nPOLYESTER\nPOLIESTERE\n",
+            ),
         ]
     )
 ]
-
-
-@pytest.mark.parametrize("materials_names, label", list(zip(MATERIALS_NAMES, LABELS)))
-def test_interpreter_find_materials(
-    interpreter: Interpreter, materials_names: List[str], label: str
-):
-    materials_names = [
-        Interpreter._standardize_material_name(material_name)
-        for material_name in materials_names
-    ]
-    materials = interpreter.find_materials(label)
-    for material in materials:
-        material.names = [
-            Interpreter._standardize_material_name(name) for name in material.names
-        ]
-    for material in materials:
-        assert any(name in materials_names for name in material.names)
-    for material_name in materials_names:
-        assert any(material_name in material.names for material in materials)
-
-
-@pytest.mark.parametrize("country, label", list(zip(COUNTRIES, LABELS)))
-def test_interpreter_find_country(
-    interpreter: Interpreter, country: List[str], label: str
-):
-    found_country = interpreter.find_country(label=label)
-    if found_country is not None or country is not None:
-        assert Interpreter._standardize_country_name(country) in [
-            Interpreter._standardize_country_name(name) for name in found_country.names
-        ]

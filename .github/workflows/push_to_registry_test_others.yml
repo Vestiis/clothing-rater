@@ -58,7 +58,7 @@ jobs:
 
       - name: Running unit tests (PyTest)
         run: |
-          pytest --log-cli-level debug src/tests
+          pytest --log-cli-level debug tests
 
       - name: Authorize Docker push
         run: gcloud auth configure-docker -q ${{ env.REGISTRY_LOCATION }}
