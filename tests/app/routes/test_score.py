@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import src.app.routes.score
-from src.app.api import APP_PREFIX, app
+from src.app.api import APP_VERSION, app
 from src.app.schemas.score import LabelMessage
 from src.meta.request import build_full_route
 from src.scorer import Preference
@@ -17,7 +17,7 @@ def assert_post_compute_score_from_label_message(
 ):
     response = client.post(
         f"http://localhost:8080"
-        f"{build_full_route(api_app_prefix=APP_PREFIX, router_prefix=src.app.routes.score.router.prefix, route=src.app.routes.score.Route.post_compute_score)}",
+        f"{build_full_route(api_app_prefix=APP_VERSION, router_prefix=src.app.routes.score.router.prefix, route=src.app.routes.score.Route.post_compute_score)}",
         data=json.dumps(label_message.dict()),
     )
     if expected_code is not None:
