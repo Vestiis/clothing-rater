@@ -1,14 +1,21 @@
+import json
 import logging
+from typing import Any
 
-from fastapi import APIRouter, FastAPI, HTTPException, Security
+import starlette.requests
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Security
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
 from src.app.helper.google_interface import GoogleInterface
 from src.app.routes import score
-from src.app.schemas.score import LabelMessageNoImageSourceError
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -16,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
-APP_PREFIX = "/v1"
+APP_VERSION = "/v1"
 
 
 def check_security(credentials: HTTPAuthorizationCredentials = Security(security)):
@@ -31,21 +38,50 @@ def check_security(credentials: HTTPAuthorizationCredentials = Security(security
 
 
 def get_application() -> FastAPI:
-    app = FastAPI(debug=True)
+    app = FastAPI()
 
-    api_router = APIRouter(prefix=APP_PREFIX)
-    api_router.include_router(score.router,)  # dependencies=[Depends(check_security)],
+    api_router = APIRouter(prefix=APP_VERSION)
+    api_router.include_router(score.router)  # dependencies=[Depends(check_security)],
+
     app.include_router(api_router)  # , dependencies=[Depends(check_security)
 
-    @app.exception_handler(LabelMessageNoImageSourceError)
-    async def label_message_no_image_source_exception_handler(request, exc):
-        logger.error(f"Pydantic error: {str(exc)}")
-        return PlainTextResponse(str(exc), status_code=400)
+    async def request_json_store_body(self) -> Any:
+        if not hasattr(self, "_json"):
+            body = await self.body()
+            self._json = json.loads(body)
+        self.scope["body"] = self._json
+        return self._json
+
+    # override starlette json function to store the body in the request scope
+    # when it is called
+    starlette.requests.Request.json = request_json_store_body
+
+    @app.exception_handler(HTTPException)
+    async def handle_http_exception(request, exc):
+        logger.error(
+            f"{exc} error for request method: {request.method} "
+            f"url: {request.url} and body: {request.scope.get('body')}"
+        )
+        return await http_exception_handler(request, exc)
+
+    @app.exception_handler(Exception)
+    async def handle_exception(request, exc):
+        print("hello")
+        logger.error(
+            f"{exc} error for request method: {request.method} "
+            f"url: {request.url} and body: {request.scope.get('body')}"
+        )
+        return JSONResponse(
+            {"detail": str(exc)}, status_code=HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request, exc):
-        logger.error(f"Wrong body: {exc.body} pydantic error: {str(exc)}")
-        return PlainTextResponse(str(exc), status_code=400)
+    async def handle_validation_exception(request, exc):
+        logger.error(
+            f"{exc} error for request method: {request.method} "
+            f"url: {request.url} and body: {request.scope.get('body')}"
+        )
+        return await request_validation_exception_handler(request, exc)
 
     app.add_middleware(
         CORSMiddleware,
