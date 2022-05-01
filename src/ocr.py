@@ -201,6 +201,7 @@ class Ocr:
             raise Exception("image_url or image_bytes must be provided to perform ocr")
 
         image = self.get_image_from_bytes(image_bytes=image_bytes)
+        logger.info(f"Got image with {image.size[0] * image.size[1]} pixels")
         preprocessed_image = self.preprocess(
             image=image, image_bounding_polys=image_bounding_polys
         )
