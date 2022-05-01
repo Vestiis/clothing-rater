@@ -66,14 +66,11 @@ def get_application() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def handle_exception(request, exc):
-        print("hello")
         logger.error(
             f"{exc} error for request method: {request.method} "
             f"url: {request.url} and body: {request.scope.get('body')}"
         )
-        return JSONResponse(
-            {"detail": str(exc)}, status_code=HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        raise exc
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_exception(request, exc):
